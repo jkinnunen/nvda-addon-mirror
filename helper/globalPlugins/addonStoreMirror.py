@@ -1,6 +1,9 @@
 # SerrebiRadio NVDA Add-on Store Mirror helper.
-# Points NVDA's built-in Add-on Store at the SerrebiRadio mirror and displays
-# the winning upstream source for each catalog entry.
+# Points NVDA's built-in Add-on Store at the SerrebiRadio mirror, displays the
+# winning upstream source for each catalog entry, adds Tools-menu entries to
+# browse the official store and the mirror side by side, lets the store list
+# filter only on demand instead of every keystroke, and warns instead of
+# silently dropping duplicate add-ons selected for install/update.
 # Adapted from nvdacn/NVDAUpdateMirror (GPL v2).
 #
 # NVDA 2025.1 is the floor. Earlier releases hardcode
@@ -10,6 +13,8 @@
 import importlib
 import threading
 
+import wx
+
 import addonHandler
 import config
 import globalPluginHandler
@@ -18,21 +23,67 @@ from logHandler import log
 addonHandler.initTranslation()
 
 MIRROR_STORE_URL = "https://serrebidev.github.io/nvda-addon-mirror"
+# An empty baseServerURL means NVDA's official store.
+OFFICIAL_STORE_URL = ""
 STORE_SOURCE_KEY = "storeSource"
 MODEL_SOURCE_ATTRIBUTE = "_serrebiStoreSource"
 
 confspec = {
 	"originalStoreURL": "string(default='')",
+	"searchAsYouType": "boolean(default=True)",
 }
 config.conf.spec["serrebiStore"] = confspec
 if "serrebiStore" not in config.conf:
 	config.conf["serrebiStore"] = {}
 
 
+def _getVmDisplayName(vm):
+	"""Best-effort display name for an Add-on Store list item view model."""
+	model = getattr(vm, "model", None)
+	name = getattr(model, "displayName", None)
+	if isinstance(name, str) and name.strip():
+		return name.strip()
+	return str(getattr(vm, "Id", "?"))
+
+
+try:
+	from gui.settingsDialogs import SettingsPanel as _SettingsPanelBase
+except ImportError:  # pragma: no cover - only reachable outside NVDA
+	_SettingsPanelBase = object
+
+
+class SerrebiStoreSettingsPanel(_SettingsPanelBase):
+	# Translators: The title of the SerrebiRadio add-on store settings panel.
+	title = _("SerrebiRadio add-on store")
+
+	def makeSettings(self, settingsSizer):
+		try:
+			searchAsYouType = config.conf["serrebiStore"]["searchAsYouType"]
+		except KeyError:
+			searchAsYouType = True
+		self._searchAsYouTypeCheckBox = settingsSizer.addItem(
+			wx.CheckBox(
+				self,
+				# Translators: A setting controlling whether the Add-on Store
+				# filters the list while typing. When off, the list only
+				# filters when Enter is pressed in the search field.
+				label=_("&Search while typing in the Add-on Store"),
+			)
+		)
+		self._searchAsYouTypeCheckBox.SetValue(bool(searchAsYouType))
+
+	def onSave(self):
+		config.conf["serrebiStore"]["searchAsYouType"] = (
+			self._searchAsYouTypeCheckBox.IsChecked()
+		)
+
+
 class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	def __init__(self):
 		super().__init__()
 		self._sourceSupportPatches = []
+		self._toolsMenuItems = []
+		self._settingsPanelRegistered = False
 		self._originalURL = ""
 		self._urlApplied = False
 		try:
@@ -61,6 +112,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		self._urlApplied = True
 		log.info(f"Set the Add-on store mirror to: {MIRROR_STORE_URL}")
 		self._enableSourceSupport()
+		self._enableStoreEnhancements()
+		self._addToolsMenuItems()
+		self._registerSettingsPanel()
 		self._refreshStore()
 
 	def _rememberPatch(self, owner, name, replacement):
@@ -197,8 +251,14 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			log.info("Added source information to the Add-on Store")
 
 	def _restoreSourceSupport(self):
+		# Compare through the owner's own __dict__ so classmethod wrappers
+		# compare against the exact object that was installed.
 		for owner, name, original, replacement in reversed(self._sourceSupportPatches):
-			if getattr(owner, name, None) is replacement:
+			try:
+				current = owner.__dict__.get(name, None)
+			except AttributeError:
+				current = getattr(owner, name, None)
+			if current is replacement:
 				setattr(owner, name, original)
 		self._sourceSupportPatches.clear()
 
@@ -229,11 +289,282 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			log.exception("Failed to refresh the add-on store data manager")
 
 	def terminate(self):
+		self._removeToolsMenuItems()
+		self._unregisterSettingsPanel()
 		self._restoreSourceSupport()
 		if not self._urlApplied:
 			return
 		config.conf["addonStore"]["baseServerURL"] = self._originalURL
 		log.info(f"Restored the Add-on store URL to: {self._originalURL}")
+
+	@property
+	def _searchAsYouType(self):
+		try:
+			return bool(config.conf["serrebiStore"]["searchAsYouType"])
+		except KeyError:
+			return True
+
+	def _enableStoreEnhancements(self):
+		"""Backported store UX fixes: deferred search and duplicate warnings."""
+		for enable in (
+			self._enableDeferredSearch,
+			self._enableDuplicateInstallWarning,
+		):
+			try:
+				enable()
+			except Exception:
+				log.exception(
+					f"SerrebiRadio store mirror could not enable {enable.__name__}",
+				)
+
+	def _enableDeferredSearch(self):
+		"""Let the store list filter on demand instead of on every keystroke.
+
+		NVDA filters on EVT_TEXT, so large lists re-filter per character. When
+		the "search while typing" setting is off, per-keystroke events are
+		ignored and the pending text is applied when Enter is pressed in the
+		search field.
+		"""
+		try:
+			storeDialogModule = importlib.import_module(
+				"gui.addonStoreGui.controls.storeDialog",
+			)
+		except ImportError:
+			log.debug("Add-on Store dialog module not found; deferred search unavailable")
+			return
+		dialogClass = getattr(storeDialogModule, "AddonStoreDialog", None)
+		if dialogClass is None:
+			return
+		originalCreateFilterControls = getattr(
+			dialogClass, "_createFilterControls", None,
+		)
+		originalOnFilterTextChange = getattr(
+			dialogClass, "onFilterTextChange", None,
+		)
+		if originalCreateFilterControls is None or originalOnFilterTextChange is None:
+			log.debug("Add-on Store dialog has no search filter to defer")
+			return
+		plugin = self
+
+		def createFilterControls(dialog):
+			originalCreateFilterControls(dialog)
+			searchCtrl = getattr(dialog, "searchFilterCtrl", None)
+			if searchCtrl is not None:
+				searchCtrl.Bind(
+					wx.EVT_KEY_DOWN,
+					lambda evt: plugin._onSearchKeyDown(dialog, evt),
+				)
+
+		def onFilterTextChange(dialog, evt):
+			if not plugin._searchAsYouType and evt.GetEventType() == wx.wxEVT_TEXT:
+				# Deferred mode: swallow the keystroke so the list is not
+				# re-filtered; Enter in the search field applies it.
+				evt.Skip()
+				return None
+			return originalOnFilterTextChange(dialog, evt)
+
+		self._rememberPatch(dialogClass, "_createFilterControls", createFilterControls)
+		self._rememberPatch(dialogClass, "onFilterTextChange", onFilterTextChange)
+
+	def _onSearchKeyDown(self, dialog, evt):
+		if (
+			evt.GetKeyCode() in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER)
+			and not self._searchAsYouType
+		):
+			# A key event is not a text event, so the onFilterTextChange
+			# wrapper lets this through to NVDA's real filter. Not skipping
+			# keeps Enter from activating the dialog's default button.
+			dialog.onFilterTextChange(evt)
+			return
+		evt.Skip()
+
+	def _enableDuplicateInstallWarning(self):
+		"""Warn instead of silently dropping duplicate add-ons in a batch.
+
+		NVDA's AddonStoreVM.getAddons logs and skips rows it cannot install,
+		so selecting the same add-on twice (for example its stable and dev
+		channels) silently installs only one of them. When duplicates are
+		found, ask whether to install the first selected version of each
+		add-on instead.
+		"""
+		try:
+			storeModule = importlib.import_module(
+				"gui.addonStoreGui.viewModels.store",
+			)
+		except ImportError:
+			log.debug("AddonStoreVM not available; duplicate warning unavailable")
+			return
+		vmClass = getattr(storeModule, "AddonStoreVM", None)
+		if vmClass is None:
+			return
+		# getAddons is a classmethod: keep the classmethod object itself so it
+		# can be restored exactly.
+		original = vmClass.__dict__.get("getAddons")
+		if original is None:
+			return
+
+		def getAddons(cls, listItemVMs, *args, **kwargs):
+			vms = list(listItemVMs)
+			firstById = {}
+			duplicateNames = set()
+			for vm in vms:
+				addonId = vm.Id
+				if addonId in firstById:
+					duplicateNames.add(_getVmDisplayName(vm))
+				else:
+					firstById[addonId] = vm
+			if duplicateNames:
+				if threading.current_thread() is threading.main_thread():
+					import gui
+
+					names = ", ".join(sorted(duplicateNames))
+					answer = gui.messageBox(
+						# Translators: Warning shown when the same add-on is
+						# selected more than once for install or update, for
+						# example its stable and dev channels.
+						_(
+							"You selected these add-ons more than once "
+							"(for example the stable and dev versions of the same add-on): "
+							"{names}. Only one copy of each add-on can be installed. "
+							"Install the first selected version of each?",
+						).format(names=names),
+						# Translators: Title of the duplicate add-ons warning.
+						_("Duplicate add-ons selected"),
+						wx.YES_NO | wx.ICON_WARNING,
+					)
+					if answer != wx.ID_YES:
+						return
+				else:
+					log.warning(
+						"Duplicate add-ons in a background batch install; "
+						f"keeping the first selected version of each: {sorted(duplicateNames)}",
+					)
+				vms = list(firstById.values())
+			return original.__func__(cls, vms, *args, **kwargs)
+
+		wrapper = classmethod(getAddons)
+		setattr(vmClass, "getAddons", wrapper)
+		self._sourceSupportPatches.append((vmClass, "getAddons", original, wrapper))
+
+	def _addToolsMenuItems(self):
+		"""Add Tools-menu entries to browse the mirror and the official store."""
+		try:
+			import gui
+		except ImportError:
+			return
+		try:
+			sysTrayIcon = gui.mainFrame.sysTrayIcon
+			toolsMenu = sysTrayIcon.toolsMenu
+		except AttributeError:
+			log.debug("Tools menu not available; skipping store menu items")
+			return
+		# Translators: Tools menu item opening the Add-on Store at the SerrebiRadio mirror.
+		mirrorItem = toolsMenu.Append(
+			wx.ID_ANY, _("Add-on store (&mirror)..."),
+		)
+		sysTrayIcon.Bind(wx.EVT_MENU, self._onBrowseMirrorStore, mirrorItem)
+		# Translators: Tools menu item opening the Add-on Store at NVDA's official store.
+		officialItem = toolsMenu.Append(
+			wx.ID_ANY, _("Add-on store (&official NVDA store)..."),
+		)
+		sysTrayIcon.Bind(wx.EVT_MENU, self._onBrowseOfficialStore, officialItem)
+		self._toolsMenuItems = [mirrorItem, officialItem]
+		log.info("Added mirror/official Add-on Store items to the Tools menu")
+
+	def _removeToolsMenuItems(self):
+		if not self._toolsMenuItems:
+			return
+		try:
+			import gui
+
+			toolsMenu = gui.mainFrame.sysTrayIcon.toolsMenu
+		except (ImportError, AttributeError):
+			self._toolsMenuItems = []
+			return
+		for item in self._toolsMenuItems:
+			toolsMenu.Remove(item)
+		self._toolsMenuItems = []
+
+	def _registerSettingsPanel(self):
+		try:
+			import gui.settingsDialogs
+		except ImportError:
+			return
+		panelClasses = gui.settingsDialogs.NVDASettingsDialog.categoryClasses
+		if SerrebiStoreSettingsPanel not in panelClasses:
+			panelClasses.append(SerrebiStoreSettingsPanel)
+			self._settingsPanelRegistered = True
+
+	def _unregisterSettingsPanel(self):
+		if not self._settingsPanelRegistered:
+			return
+		try:
+			import gui.settingsDialogs
+
+			gui.settingsDialogs.NVDASettingsDialog.categoryClasses.remove(
+				SerrebiStoreSettingsPanel,
+			)
+		except (ImportError, ValueError):
+			pass
+		self._settingsPanelRegistered = False
+
+	def _onBrowseMirrorStore(self, evt):
+		self._openStore(MIRROR_STORE_URL, restoreURL=None)
+
+	def _onBrowseOfficialStore(self, evt):
+		# An empty baseServerURL is NVDA's official store; switch back to the
+		# mirror when that dialog closes.
+		self._openStore(OFFICIAL_STORE_URL, restoreURL=MIRROR_STORE_URL)
+
+	def _openStore(self, url, restoreURL):
+		"""Open the Add-on Store at the given URL.
+
+		When restoreURL is given, the configured URL is switched back and the
+		data manager refreshed when the dialog closes.
+		"""
+		import gui
+		from gui import SettingsDialog
+		from gui.addonStoreGui import AddonStoreDialog
+		from gui.addonStoreGui.viewModels.store import AddonStoreVM
+
+		for win in wx.GetTopLevelWindows():
+			if isinstance(win, AddonStoreDialog):
+				win.Raise()
+				win.SetFocus()
+				return
+		previousURL = config.conf["addonStore"]["baseServerURL"]
+		config.conf["addonStore"]["baseServerURL"] = url
+		try:
+			storeVM = AddonStoreVM()
+			storeVM.refresh()
+			prePopup = getattr(gui.mainFrame, "prePopup", None)
+			if prePopup is not None:
+				prePopup()
+			try:
+				dialog = AddonStoreDialog(gui.mainFrame, storeVM)
+			except SettingsDialog.MultiInstanceErrorWithDialog as error:
+				config.conf["addonStore"]["baseServerURL"] = previousURL
+				error.dialog.SetFocus()
+				return
+			if restoreURL is not None:
+				dialog.Bind(wx.EVT_CLOSE, self._makeCloseRestorer(restoreURL))
+			dialog.Show()
+		except Exception:
+			config.conf["addonStore"]["baseServerURL"] = previousURL
+			log.exception("Failed to open the Add-on Store")
+			return
+		finally:
+			postPopup = getattr(gui.mainFrame, "postPopup", None)
+			if postPopup is not None:
+				postPopup()
+
+	def _makeCloseRestorer(self, restoreURL):
+		def onClose(evt):
+			config.conf["addonStore"]["baseServerURL"] = restoreURL
+			self._refreshStore()
+			evt.Skip()
+
+		return onClose
 
 
 def _getModelSource(model):
