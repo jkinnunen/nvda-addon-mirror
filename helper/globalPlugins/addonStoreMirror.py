@@ -11,6 +11,7 @@
 # so no add-on can redirect their Add-on Store anywhere.
 
 import importlib
+import os
 import threading
 
 import wx
@@ -87,6 +88,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		self._settingsPanelRegistered = False
 		self._originalURL = ""
 		self._urlApplied = False
+		self._removeStaleBundleModule()
 		try:
 			currentURL = config.conf["addonStore"]["baseServerURL"]
 		except KeyError:
@@ -449,6 +451,19 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		setattr(vmClass, "getAddons", wrapper)
 		self._sourceSupportPatches.append((vmClass, "getAddons", original, wrapper))
 
+	def _removeStaleBundleModule(self):
+		# Version 1.4.0 shipped the bundle code as globalPlugins/addonStoreBundles.py,
+		# which NVDA's plugin loader mistakes for a global plugin and logs an error
+		# for. It now lives in _addonStoreBundles.py (underscore-prefixed modules are
+		# skipped by the loader); remove the stale file if an update left it behind.
+		stale = os.path.join(os.path.dirname(__file__), "addonStoreBundles.py")
+		try:
+			if os.path.isfile(stale):
+				os.remove(stale)
+				log.info("Removed stale bundle module left by addonStoreMirror 1.4.0")
+		except OSError:
+			log.warning("Could not remove stale bundle module", exc_info=True)
+
 	def _addToolsMenuItems(self):
 		"""Add a Tools-menu entry to browse NVDA's official Add-on Store.
 
@@ -494,7 +509,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 	def _onExportBundle(self, evt):
 		try:
-			import addonStoreBundles
+			from . import _addonStoreBundles as addonStoreBundles
 			import addonHandler
 			import gui
 		except ImportError:
@@ -516,7 +531,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 	def _onImportBundle(self, evt):
 		try:
-			import addonStoreBundles
+			from . import _addonStoreBundles as addonStoreBundles
 			import addonHandler
 			import gui
 		except ImportError:

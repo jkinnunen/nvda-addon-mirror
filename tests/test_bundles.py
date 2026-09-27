@@ -17,7 +17,7 @@ BUNDLES_PATH = (
     Path(__file__).resolve().parents[1]
     / "helper"
     / "globalPlugins"
-    / "addonStoreBundles.py"
+    / "_addonStoreBundles.py"
 )
 
 
@@ -103,6 +103,12 @@ class BundleFormatTests(unittest.TestCase):
 
     def setUp(self):
         self._translate()
+
+    def test_module_name_is_loader_safe(self):
+        # NVDA's globalPluginHandler skips modules whose names start with "_";
+        # the bundle helper must keep that prefix or NVDA logs an import error.
+        self.assertTrue(BUNDLES_PATH.name.startswith("_"))
+        self.assertTrue(BUNDLES_PATH.is_file())
 
     def test_build_parse_round_trip(self):
         entries = [

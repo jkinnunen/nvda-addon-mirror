@@ -1,6 +1,8 @@
 import builtins
 import importlib.util
 import itertools
+import os
+import tempfile
 from pathlib import Path
 import sys
 import types
@@ -613,6 +615,32 @@ class HelperToolsMenuTests(unittest.TestCase):
         self.assertEqual([], plugin._toolsMenuItems)
         self.assertIsNone(plugin._bundleMenu)
         self.assertTrue(bundleMenu.destroyed)
+
+
+class HelperStaleBundleModuleTests(unittest.TestCase):
+    """_removeStaleBundleModule: clean up the 1.4.0 helper filename."""
+
+    _loadHelper = HelperSourceSupportTests._loadHelper
+
+    def test_removes_stale_module(self):
+        helper = self._loadHelper({})
+        plugin = helper.GlobalPlugin.__new__(helper.GlobalPlugin)
+        with tempfile.TemporaryDirectory() as tmp:
+            stale = os.path.join(tmp, "addonStoreBundles.py")
+            with open(stale, "w") as f:
+                f.write("# stale")
+            fakeFile = os.path.join(tmp, "addonStoreMirror.py")
+            with mock.patch.object(helper, "__file__", fakeFile):
+                plugin._removeStaleBundleModule()
+            self.assertFalse(os.path.exists(stale))
+
+    def test_missing_stale_module_is_fine(self):
+        helper = self._loadHelper({})
+        plugin = helper.GlobalPlugin.__new__(helper.GlobalPlugin)
+        with tempfile.TemporaryDirectory() as tmp:
+            fakeFile = os.path.join(tmp, "addonStoreMirror.py")
+            with mock.patch.object(helper, "__file__", fakeFile):
+                plugin._removeStaleBundleModule()  # must not raise
 
 
 class HelperOpenStoreTests(unittest.TestCase):
