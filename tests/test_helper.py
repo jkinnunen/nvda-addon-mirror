@@ -51,6 +51,23 @@ class _WxModule(types.ModuleType):
         return value
 
 
+class _FakeMenu:
+    """Fake wx.Menu: supports Append for submenu items and Destroy."""
+
+    def __init__(self):
+        self.items = []
+        self.destroyed = False
+
+    def Append(self, _id, label):
+        item = ("submenu-item", label)
+        self.items.append(item)
+        return item
+
+    def Destroy(self):
+        self.destroyed = True
+        return True
+
+
 class HelperSourceSupportTests(unittest.TestCase):
     def _loadHelper(self, extraModules, addonStoreConf=None):
         config = types.ModuleType("config")
@@ -521,6 +538,11 @@ class HelperToolsMenuTests(unittest.TestCase):
                 self.items.append(item)
                 return item
 
+            def AppendSubMenu(self, submenu, label):
+                item = ("submenu", label, submenu)
+                self.items.append(item)
+                return item
+
             def Remove(self, item):
                 self.removed.append(item)
                 return item
@@ -537,6 +559,7 @@ class HelperToolsMenuTests(unittest.TestCase):
         gui = types.ModuleType("gui")
         gui.mainFrame = mainFrame
         helper = self._loadHelper({"gui": gui})
+        self.wx.Menu = _FakeMenu
         plugin = helper.GlobalPlugin.__new__(helper.GlobalPlugin)
         plugin._sourceSupportPatches = []
         plugin._toolsMenuItems = []
@@ -550,13 +573,25 @@ class HelperToolsMenuTests(unittest.TestCase):
     def test_official_store_item_added(self):
         _helper, _plugin, gui, _modules = self._makeMenuPlugin()
         menu = gui.mainFrame.sysTrayIcon.toolsMenu
-        self.assertEqual(1, len(menu.items))
+        self.assertEqual(2, len(menu.items))
         _item, label = menu.items[0]
         self.assertIn("official", label)
         binds = gui.mainFrame.sysTrayIcon.binds
-        self.assertEqual(1, len(binds))
+        self.assertEqual(3, len(binds))
         event, _handler, _source = binds[0]
         self.assertIs(self.wx.EVT_MENU, event)
+
+    def test_bundle_submenu_added(self):
+        _helper, plugin, gui, _modules = self._makeMenuPlugin()
+        menu = gui.mainFrame.sysTrayIcon.toolsMenu
+        kind, label, submenu = menu.items[1]
+        self.assertEqual("submenu", kind)
+        self.assertIn("bundle", label.lower())
+        self.assertEqual(2, len(submenu.items))
+        subLabels = [itemLabel for _kind, itemLabel in submenu.items]
+        self.assertTrue(any("Export" in itemLabel for itemLabel in subLabels))
+        self.assertTrue(any("Install" in itemLabel for itemLabel in subLabels))
+        self.assertIsNotNone(plugin._bundleMenu)
 
     def test_menu_handler_opens_official_store(self):
         helper, plugin, _gui, _modules = self._makeMenuPlugin()
@@ -571,10 +606,13 @@ class HelperToolsMenuTests(unittest.TestCase):
     def test_remove_menu_items(self):
         _helper, plugin, gui, modules = self._makeMenuPlugin()
         menu = gui.mainFrame.sysTrayIcon.toolsMenu
+        bundleMenu = plugin._bundleMenu
         with mock.patch.dict(sys.modules, modules):
             plugin._removeToolsMenuItems()
-        self.assertEqual(1, len(menu.removed))
+        self.assertEqual(2, len(menu.removed))
         self.assertEqual([], plugin._toolsMenuItems)
+        self.assertIsNone(plugin._bundleMenu)
+        self.assertTrue(bundleMenu.destroyed)
 
 
 class HelperOpenStoreTests(unittest.TestCase):
@@ -878,6 +916,11 @@ class HelperInitTerminateTests(unittest.TestCase):
                 self.items.append(item)
                 return item
 
+            def AppendSubMenu(self, submenu, label):
+                item = ("submenu", label, submenu)
+                self.items.append(item)
+                return item
+
             def Remove(self, item):
                 self.removed.append(item)
 
@@ -893,6 +936,7 @@ class HelperInitTerminateTests(unittest.TestCase):
         gui = types.ModuleType("gui")
         gui.mainFrame = types.SimpleNamespace(sysTrayIcon=FakeSysTrayIcon())
         gui.settingsDialogs = settingsDialogs
+        self.wx.Menu = _FakeMenu
 
         return {
             "addonStore": addonStorePkg,
@@ -930,7 +974,7 @@ class HelperInitTerminateTests(unittest.TestCase):
             "", self.config.conf["serrebiStore"]["originalStoreURL"],
         )
         menu = fakes["gui"].mainFrame.sysTrayIcon.toolsMenu
-        self.assertEqual(1, len(menu.items))
+        self.assertEqual(2, len(menu.items))
         self.assertIn(
             helper.SerrebiStoreSettingsPanel,
             fakes["gui.settingsDialogs"].NVDASettingsDialog.categoryClasses,
@@ -944,8 +988,9 @@ class HelperInitTerminateTests(unittest.TestCase):
             plugin.terminate()
 
         self.assertEqual("", self.config.conf["addonStore"]["baseServerURL"])
-        self.assertEqual(1, len(menu.removed))
+        self.assertEqual(2, len(menu.removed))
         self.assertEqual([], plugin._toolsMenuItems)
+        self.assertIsNone(plugin._bundleMenu)
         self.assertEqual(
             [],
             fakes["gui.settingsDialogs"].NVDASettingsDialog.categoryClasses,

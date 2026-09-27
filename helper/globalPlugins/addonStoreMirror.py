@@ -83,6 +83,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		super().__init__()
 		self._sourceSupportPatches = []
 		self._toolsMenuItems = []
+		self._bundleMenu = None
 		self._settingsPanelRegistered = False
 		self._originalURL = ""
 		self._urlApplied = False
@@ -470,7 +471,86 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		)
 		sysTrayIcon.Bind(wx.EVT_MENU, self._onBrowseOfficialStore, officialItem)
 		self._toolsMenuItems = [officialItem]
+		self._addBundleMenuItems(toolsMenu, sysTrayIcon)
 		log.info("Added official Add-on Store item to the Tools menu")
+
+	def _addBundleMenuItems(self, toolsMenu, sysTrayIcon):
+		"""Add the Add-on bundles submenu (export/import) to the Tools menu."""
+		bundleMenu = wx.Menu()
+		# Translators: Tools menu item exporting installed add-ons as a bundle file.
+		exportItem = bundleMenu.Append(
+			wx.ID_ANY, _("Export installed add-ons as bundle..."),
+		)
+		sysTrayIcon.Bind(wx.EVT_MENU, self._onExportBundle, exportItem)
+		# Translators: Tools menu item installing add-ons from a bundle file.
+		importItem = bundleMenu.Append(
+			wx.ID_ANY, _("Install add-ons from bundle file..."),
+		)
+		sysTrayIcon.Bind(wx.EVT_MENU, self._onImportBundle, importItem)
+		# Translators: Tools submenu for add-on bundle export/import.
+		subMenuItem = toolsMenu.AppendSubMenu(bundleMenu, _("Add-on bundles..."))
+		self._toolsMenuItems.append(subMenuItem)
+		self._bundleMenu = bundleMenu
+
+	def _onExportBundle(self, evt):
+		try:
+			import addonStoreBundles
+			import addonHandler
+			import gui
+		except ImportError:
+			return
+		installed = addonStoreBundles.getInstalledAddons(addonHandler)
+		if not installed:
+			wx.MessageBox(
+				# Translators: Shown when exporting a bundle with no add-ons installed.
+				_("There are no installed add-ons to export."),
+				_("Export add-on bundle"),
+				wx.OK | wx.ICON_INFORMATION,
+			)
+			return
+		dialog = addonStoreBundles.ExportBundleDialog(gui.mainFrame, installed)
+		try:
+			dialog.ShowModal()
+		finally:
+			dialog.Destroy()
+
+	def _onImportBundle(self, evt):
+		try:
+			import addonStoreBundles
+			import addonHandler
+			import gui
+		except ImportError:
+			return
+		# Translators: File dialog title and filter for opening a bundle.
+		wildcard = _("NVDA add-on bundle (*%s)|*%s") % (
+			addonStoreBundles.BUNDLE_EXTENSION, addonStoreBundles.BUNDLE_EXTENSION,
+		)
+		with wx.FileDialog(
+			gui.mainFrame, _("Choose an add-on bundle"), wildcard=wildcard,
+			style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+		) as fileDialog:
+			if fileDialog.ShowModal() != wx.ID_OK:
+				return
+			path = fileDialog.GetPath()
+		try:
+			bundle = addonStoreBundles.loadBundleFile(path)
+		except addonStoreBundles.BundleError as e:
+			wx.MessageBox(str(e), _("Install from add-on bundle"), wx.OK | wx.ICON_ERROR)
+			return
+		try:
+			catalogMap = addonStoreBundles.fetchCatalogMap()
+		except Exception:
+			log.warning("Could not fetch the mirror catalog for bundle import", exc_info=True)
+			catalogMap = {}
+		installedMap = {
+			item["addonId"]: item
+			for item in addonStoreBundles.getInstalledAddons(addonHandler)
+		}
+		dialog = addonStoreBundles.ImportBundleDialog(gui.mainFrame, bundle, catalogMap, installedMap)
+		try:
+			dialog.ShowModal()
+		finally:
+			dialog.Destroy()
 
 	def _removeToolsMenuItems(self):
 		if not self._toolsMenuItems:
@@ -481,10 +561,16 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			toolsMenu = gui.mainFrame.sysTrayIcon.toolsMenu
 		except (ImportError, AttributeError):
 			self._toolsMenuItems = []
+			if self._bundleMenu is not None:
+				self._bundleMenu.Destroy()
+				self._bundleMenu = None
 			return
 		for item in self._toolsMenuItems:
 			toolsMenu.Remove(item)
 		self._toolsMenuItems = []
+		if self._bundleMenu is not None:
+			self._bundleMenu.Destroy()
+			self._bundleMenu = None
 
 	def _registerSettingsPanel(self):
 		try:

@@ -121,11 +121,13 @@ https://serrebidev.github.io/nvda-addon-mirror
 Three ways to do this:
 
 1. **Install the helper add-on** — latest build:
-   [dist/addonStoreMirror-1.3.8.nvda-addon](dist/addonStoreMirror-1.3.8.nvda-addon)
-   (raw link: https://raw.githubusercontent.com/serrebidev/nvda-addon-mirror/main/dist/addonStoreMirror-1.3.8.nvda-addon).
+   [dist/addonStoreMirror-1.4.0.nvda-addon](dist/addonStoreMirror-1.4.0.nvda-addon)
+   (raw link: https://raw.githubusercontent.com/serrebidev/nvda-addon-mirror/main/dist/addonStoreMirror-1.4.0.nvda-addon).
    It sets `[addonStore] baseServerURL` to the mirror on startup and restores it
    when disabled — the same mechanism
    [nvdacn/NVDAUpdateMirror](https://github.com/nvdacn/NVDAUpdateMirror) uses.
+   Version 1.4.0 adds add-on bundles (see below): export your installed
+   add-ons as a single shareable file and install a whole bundle at once.
    Version 1.3.8 keeps a single extra Tools-menu entry for NVDA's official
    store (the regular Add-on Store option already opens the mirror).
    Version 1.3.7 fixed the store failing to open on recent NVDA alphas.
@@ -136,6 +138,27 @@ Three ways to do this:
    modified. 1.2.0 added source visibility and source-aware search; 1.1.1
    fixed a crash caused by replacing NVDA's live Add-on Store data manager;
    1.0.0 had a trailing-slash URL bug.
+
+### Add-on bundles
+
+Since 1.4.0 the helper can pack your whole add-on setup into one small
+`.nvda-bundle` file and install such a file in one go — a Ninite-style way
+to share add-on setups without sending a portable NVDA copy around.
+
+- **Export:** NVDA menu > Tools > Add-on bundles > "Export installed add-ons
+  as bundle...". Pick the add-ons, choose "Latest available" or "Pin to my
+  installed versions", save the file. The bundle only contains download
+  links, never the add-ons themselves.
+- **Install:** "Install add-ons from bundle file..." opens a `.nvda-bundle`,
+  shows every add-on with its version and download source, and installs the
+  ones you check — one restart at the end instead of one per add-on.
+  Add-ons you already have at the same version are unchecked automatically.
+
+Only install bundles from people you trust: a bundle is a list of download
+URLs, and the import dialog shows exactly where each add-on comes from.
+Pinned entries also carry a SHA-256 checksum that is verified after
+downloading.
+
 2. **Edit `nvda.ini`** manually:
    ```ini
    [addonStore]
