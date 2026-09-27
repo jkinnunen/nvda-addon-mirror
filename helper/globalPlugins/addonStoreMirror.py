@@ -346,8 +346,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			return
 		plugin = self
 
-		def createFilterControls(dialog):
-			originalCreateFilterControls(dialog)
+		def createFilterControls(dialog, *args, **kwargs):
+			# Recent NVDA passes the sizer helper; older versions pass
+			# nothing. Forward whatever is given.
+			originalCreateFilterControls(dialog, *args, **kwargs)
 			searchCtrl = getattr(dialog, "searchFilterCtrl", None)
 			if searchCtrl is not None:
 				searchCtrl.Bind(

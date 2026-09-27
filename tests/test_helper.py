@@ -298,8 +298,10 @@ class HelperDeferredSearchTests(unittest.TestCase):
             def __init__(self):
                 self.searchFilterCtrl = FakeSearchCtrl()
                 self.filterCalls = []
+                self.createFilterArgs = None
 
-            def _createFilterControls(self):
+            def _createFilterControls(self, *args, **kwargs):
+                self.createFilterArgs = (args, kwargs)
                 self.searchFilterCtrl = FakeSearchCtrl()
 
             def onFilterTextChange(self, evt):
@@ -323,7 +325,9 @@ class HelperDeferredSearchTests(unittest.TestCase):
         ):
             plugin._enableDeferredSearch()
         dialog = FakeDialog()
-        dialog._createFilterControls()
+        # Recent NVDA passes the sizer helper; this is the call that raised
+        # TypeError on NVDA alpha before the wrapper forwarded arguments.
+        dialog._createFilterControls("SIZER")
         return helper, plugin, dialog
 
     def _keyHandlers(self, dialog):
@@ -332,6 +336,10 @@ class HelperDeferredSearchTests(unittest.TestCase):
             for event, handler in dialog.searchFilterCtrl.binds
             if event is self.wx.EVT_KEY_DOWN
         ]
+
+    def test_create_filter_controls_forwards_sizer_argument(self):
+        _helper, _plugin, dialog = self._makeDialogPlugin(searchAsYouType=False)
+        self.assertEqual((("SIZER",), {}), dialog.createFilterArgs)
 
     def test_key_handler_bound_to_search_field(self):
         _helper, _plugin, dialog = self._makeDialogPlugin(searchAsYouType=False)
