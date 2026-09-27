@@ -1,5 +1,9 @@
 {
  "translations": {
+  "Aprendizaje de Python con NVDA": {
+   "summary": "Learning Python with NVDA",
+   "description": "Training tool and accessible code editor for programming in Python with NVDA. Provides a structured learning path of 32 conceptual and practical chapters (128 lessons), complemented by a dual-mode work environment: guided tutor mode and standalone editor mode. Includes navigation by code elements such as functions and classes, audio cues for indentation and structure, delimiter checking, and simplified error messages."
+  },
   "appleMusicSuggestLess": {
    "summary": "Apple Music"
   },
@@ -282,6 +286,14 @@
   },
   "polyglot": {
    "description": "The Polyglot add-on is designed for fast and flexible multilingual translation in NVDA.\nIt allows you to translate selected text, the contents of the clipboard, and the last spoken phrase.\nTo call translation functions, use the command layer by pressing NVDA+Alt+Z.\nThe add-on supports automatic translation of spoken NVDA content in real time.\nThe built-in intelligent speech filter skips roles, states, and formatting during translation.\nPolyglot uses a dynamic architecture of engines that are connected and configured as needed.\nGoogle Translate, Microsoft Translator, DeepL, Baidu, Yandex and others engines are available.\nSupports work with the offline Chrome AI engine for translation without an Internet connection.\nFor engines based on Ollama and OpenRouter, customization of models and request templates is available.\nTranslation results are cached to reduce the number of repeated requests.\nThe cache can be cleared manually through the settings panel or with a command from the layer.\nWhen running NVDA in Chinese, a local English-Chinese dictionary with more than 120 thousand entries is available.\nFor lengthy translations, an interactive dialogue is provided with the ability to select an engine and languages ​​on the fly.\nAutomatic translation is disabled after three unsuccessful attempts in a row.\nAll engine settings are generated dynamically based on their own descriptions.\nSupports switching languages ​​and engines without opening the settings window.\nYou can read more about all the features of the add-on in the reference manual."
+  },
+  "audioEQ": {
+   "summary": "AudioEQ",
+   "description": "The AudioEQ add-on is a real-time multi-effect audio processor for NVDA, including a resonant high-pass filter (HPF) and low-pass filter (LPF), a four-band parametric equalizer, master gain, an 1176 compressor, a shared LFO in Free/Trigger modes for pan/LPF/HPF, stereo chorus, stereo delay, stereo reverb and a limiter. Chorus stays a parallel send while delay and reverb form an orderable serial send chain; the dry signal stays at full level and all wet returns are summed sample-accurately into the same WavePlayer master buffer, with no separate wet player, so old effect audio cannot leak under subsequent speech. Includes optional preset-aware NVDA audio-device locking, independently switchable delay/reverb gate hold tails after the source (off by default), 32 factory presets, user presets, Custom Actions API integration, and documentation in English, Italian, Spanish and French. The first effect feeds the second; a 'Delay before reverb' checkbox selects Delay -> Reverb when on and Reverb -> Delay when off. A 0-100 Chain Blend control sets how much of the first wet return stays directly audible: 0 keeps the previous mix, 100 lets the first effect be heard only through the second. Current limitation: this release targets 64-bit NVDA and audio paths using nvwave/WavePlayer."
+  },
+  "audioFX": {
+   "summary": "audioFX",
+   "description": "The audioFX add-on improves sound quality and real-time effects for NVDA synthesizers. It offers a 4-band parametric equalizer, high/low-pass filters, a compressor, a limiter, a pan LFO with several waveforms, and chorus, delay and reverb effects. Effects can be applied globally to all synthesizers or as individual profiles per synthesizer and voice. On the Sound Profiles tab you can select ANY synthesizer and voice installed in NVDA, even one that is not currently active, and preset a profile for it. The settings window and a reset-to-defaults option are in the Preferences menu under the 'Sound quality and effects' submenu."
   },
   "audioSwitcher": {
    "summary": "AudioSwitcher",
@@ -1774,6 +1786,10 @@
    "summary": "Ru Store",
    "description": "The Ru Store add-on will allow NVDA users to comfortably use the catalog of add-ons from the Russian community.\nThe add-on provides the following options:\nInstalling/Removing add-ons.\nUpdating/reinstalling installed add-ons.\nEnable/Disable installed add-ons.\nView a short description and other details of the add-on.\nCopying the add-on download link to the clipboard.\nSearch by titles, authors and descriptions of all available add-ons.\nView available, installed and updated add-ons.\nEnable the display of incompatible add-ons (By default, only those compatible with the version of NVDA you are using are displayed).\nCopying a link to the add-on developer's home page.\nFilter by date and number of downloads.\nTo open the RuStore add-on store, follow the path:\nNVDA menu, Service submenu, RuStore add-on store.\nIn input gestures, in the “Service” category, for the “Activates the RuStore add-on store” shortcut, you can assign a keyboard shortcut for quick access to the store interface.\nMore information about RuStore functionality can be found in the add-on help documentation."
   },
+  "RuStorePlus": {
+   "summary": "RuStorePlus",
+   "description": "The RuStorePlus add-on gives access to the NVDA add-on store from the Russian-speaking NVDA community. Note: this is a fork of the original RuStore add-on with some improvements. Browse available add-ons from the online catalog, install and update add-ons directly from the NVDA interface, filter and search the catalog, download add-ons to your computer, hide unneeded add-ons to simplify navigation, view detailed information about each add-on including changes, and copy direct links to add-on files. All features are described in detail in the reference guide."
+  },
   "WlanReporter": {
    "description": "The WlanReporter add-on provides automatic voice and audio notifications about connecting/disconnecting wireless networks and enabling/disabling wireless network adapters in the system.\nThis add-on also provides a command to advertise the current wireless connection status for all available network adapters on the system.\nThe desired keyboard shortcut for this command can be assigned in the “System Status” category of the NVDA Input Gestures dialog."
   },
@@ -2484,6 +2500,10 @@
    "summary": "SilentTyping",
    "description": "SilentTyping is a simple addition that suppresses the declaration of alphanumeric keys in non-editable controls.\nFor example:\nIn a text editor or other editors, the spacebar key will be pronounced when pressed, but in the PotPlayer interface\nor any sound editor, voice recorder, the pressed key will not be pronounced.\nIn Explorer, when going through shortcuts, folders, files by the first letter, you will not hear the letter you press, but will immediately hear the name of the folder, file, shortcut.\nThe addition will also be useful for those who make various audio recordings in voice recorders and sound editors, when it is not necessary for the pronunciation of the keys pressed to be included in the recording.\nThe add-on has no settings and starts working immediately after installation and restarting NVDA."
   },
+  "AudioKeepAlive": {
+   "summary": "AudioKeepAlive",
+   "description": "The AudioKeepAlive add-on for NVDA prevents the audio driver from going idle during quiet periods. It works by periodically sending silent audio pulses through Windows' built-in winsound function, keeping the sound card awake so speech resumes without delays or clicks. Enabled by default with a 3.5-second pulse interval, adjustable from 1 to 10 seconds in 0.5-second steps. Settings open from the NVDA menu under the 'AudioKeepAlive' submenu or via the Preferences menu; the settings dialog has an enable checkbox, an interval selector, and OK and Cancel buttons, and all changes apply immediately and are saved to NVDA's configuration. The add-on also provides an NVDA+Control+Shift+A command to quickly toggle the feature; enabling announces 'Audio keep-alive enabled' and disabling announces 'Audio keep-alive disabled'. Its operation does not affect NVDA speech or sound playback."
+  },
   "AudioControl": {
    "summary": "AudioControl",
    "description": "AudioControl add-on for controlling the audio process and audio output devices.\nAdd-ons to adjust volume, configure mute mode, and toggle NVDA audio output for running applications.\nKeyboard shortcuts are described in the help.\nCommands can be changed in input gestures, in the Sound Control section."
@@ -3189,6 +3209,10 @@
   "HighlighterPlus": {
    "summary": "HighlighterPlus",
    "description": "The HighlighterPlus add-on is a copy of NVDA's highlighting functionality and is also a proof of concept for improving the current NVDA's highlighting.\nCurrent improvements are as follows: the marker regularly checks the position of objects to be tracked and updates the rectangles."
+  },
+  "HyperMarket": {
+   "summary": "HyperMarket",
+   "description": "The HyperMarket add-on gives access to the Russian-language NVDA add-on catalog. Note: HyperMarket is a fork of a fork of RuStorePlus, which is itself a fork of the original RuStore. The interface has three tabs: available, installed and updatable add-ons. It supports filtering by category and subcategory (general, synthesizer voices and others), sorting by update date, name and download count, and searching by name, author, description and add-on ID. Add-ons can be installed, updated, enabled, disabled and removed. Downloading saves the add-on file to the Downloads folder with progress shown. Column visibility can be configured separately for each of the three tabs; hiding add-ons works per tab and persists between sessions, and hidden add-ons can be restored in one action from the context menu. You can view a short description and changes (if any); additional details show the category and subcategory in Russian. All features are described in the reference guide."
   },
   "HerramientasReaper": {
    "description": "HerramientasReaper add-on for easy access to tutorials on the ReaperYOtrasYerbas.com website, direct download of reaper installers and additional tools, as well as publishing sites with vst plugins."
@@ -4125,10 +4149,12 @@
    "summary": "Role Announce"
   },
   "samsungGalaxyVoices": {
-   "summary": "Samsung Galaxy Voices"
+   "summary": "Samsung Galaxy Voices",
+   "description": "Samsung Galaxy Voices makes compatible Samsung speech voices available locally through NVDA. The add-on contains no Samsung speech engine or voice package; users choose voices in an accessible manager, and the chosen package is downloaded directly from Samsung only after the user allows it. Installed voices work offline, with no phone, virtual machine, system-wide installation or constant network connection required. The voice manager supports original-generation and newer Galaxy S24 premium voices, multiple selection, background downloading, removal, local samples, live voice refresh and package sizes. NVDA exposes voice, rate, pitch, volume, spelling, interruption and Say All support. This independent project is not affiliated with or endorsed by Samsung."
   },
   "samsungTVVoices": {
-   "summary": "Samsung TV Voices"
+   "summary": "Samsung TV Voices",
+   "description": "Samsung TV Voices makes compatible speech voices from official Samsung television firmware available through NVDA. The add-on contains no Samsung firmware, speech engine, model or voice data; users choose an official regional firmware package, which is downloaded directly from Samsung and verified before its speech components are installed. The accessible manager supports background and multiple-package downloads, removal, live voice refresh, resumable transfers and a stable status list. NVDA exposes voice, rate, pitch, volume, head size, interruption, spelling and Say All support. This independent project is not affiliated with or endorsed by Samsung."
   },
   "saraSilent": {
    "summary": "Sara Silent"
