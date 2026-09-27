@@ -502,7 +502,11 @@ class HelperDuplicateWarningTests(unittest.TestCase):
 
 
 class HelperToolsMenuTests(unittest.TestCase):
-    """Tools menu: browse the mirror and the official store side by side."""
+    """Tools menu: one extra entry for NVDA's official Add-on Store.
+
+    The regular Add-on Store menu option already opens the SerrebiRadio
+    mirror, so only the official store needs its own entry.
+    """
 
     _loadHelper = HelperSourceSupportTests._loadHelper
 
@@ -543,33 +547,33 @@ class HelperToolsMenuTests(unittest.TestCase):
             plugin._addToolsMenuItems()
         return helper, plugin, gui, modules
 
-    def test_two_store_items_added(self):
+    def test_official_store_item_added(self):
         _helper, _plugin, gui, _modules = self._makeMenuPlugin()
         menu = gui.mainFrame.sysTrayIcon.toolsMenu
-        self.assertEqual(2, len(menu.items))
-        labels = [label for _item, label in menu.items]
-        self.assertTrue(any("mirror" in label for label in labels))
-        self.assertTrue(any("official" in label for label in labels))
+        self.assertEqual(1, len(menu.items))
+        _item, label = menu.items[0]
+        self.assertIn("official", label)
         binds = gui.mainFrame.sysTrayIcon.binds
-        self.assertEqual(2, len(binds))
-        for event, _handler, _source in binds:
-            self.assertIs(self.wx.EVT_MENU, event)
+        self.assertEqual(1, len(binds))
+        event, _handler, _source = binds[0]
+        self.assertIs(self.wx.EVT_MENU, event)
 
-    def test_menu_handlers_open_the_right_store(self):
+    def test_menu_handler_opens_official_store(self):
         helper, plugin, _gui, _modules = self._makeMenuPlugin()
         opened = []
         plugin._openStore = lambda url, restoreURL: opened.append((url, restoreURL))
         for _event, handler, _source in _gui.mainFrame.sysTrayIcon.binds:
             handler(None)
-        self.assertIn((helper.MIRROR_STORE_URL, None), opened)
-        self.assertIn((helper.OFFICIAL_STORE_URL, helper.MIRROR_STORE_URL), opened)
+        self.assertEqual(
+            [(helper.OFFICIAL_STORE_URL, helper.MIRROR_STORE_URL)], opened,
+        )
 
     def test_remove_menu_items(self):
         _helper, plugin, gui, modules = self._makeMenuPlugin()
         menu = gui.mainFrame.sysTrayIcon.toolsMenu
         with mock.patch.dict(sys.modules, modules):
             plugin._removeToolsMenuItems()
-        self.assertEqual(2, len(menu.removed))
+        self.assertEqual(1, len(menu.removed))
         self.assertEqual([], plugin._toolsMenuItems)
 
 
@@ -926,7 +930,7 @@ class HelperInitTerminateTests(unittest.TestCase):
             "", self.config.conf["serrebiStore"]["originalStoreURL"],
         )
         menu = fakes["gui"].mainFrame.sysTrayIcon.toolsMenu
-        self.assertEqual(2, len(menu.items))
+        self.assertEqual(1, len(menu.items))
         self.assertIn(
             helper.SerrebiStoreSettingsPanel,
             fakes["gui.settingsDialogs"].NVDASettingsDialog.categoryClasses,
@@ -940,7 +944,7 @@ class HelperInitTerminateTests(unittest.TestCase):
             plugin.terminate()
 
         self.assertEqual("", self.config.conf["addonStore"]["baseServerURL"])
-        self.assertEqual(2, len(menu.removed))
+        self.assertEqual(1, len(menu.removed))
         self.assertEqual([], plugin._toolsMenuItems)
         self.assertEqual(
             [],

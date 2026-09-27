@@ -449,7 +449,11 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		self._sourceSupportPatches.append((vmClass, "getAddons", original, wrapper))
 
 	def _addToolsMenuItems(self):
-		"""Add Tools-menu entries to browse the mirror and the official store."""
+		"""Add a Tools-menu entry to browse NVDA's official Add-on Store.
+
+		The regular Add-on Store menu option already opens the SerrebiRadio
+		mirror, so only the official store needs its own entry.
+		"""
 		try:
 			import gui
 		except ImportError:
@@ -458,20 +462,15 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			sysTrayIcon = gui.mainFrame.sysTrayIcon
 			toolsMenu = sysTrayIcon.toolsMenu
 		except AttributeError:
-			log.debug("Tools menu not available; skipping store menu items")
+			log.debug("Tools menu not available; skipping store menu item")
 			return
-		# Translators: Tools menu item opening the Add-on Store at the SerrebiRadio mirror.
-		mirrorItem = toolsMenu.Append(
-			wx.ID_ANY, _("Add-on store (&mirror)..."),
-		)
-		sysTrayIcon.Bind(wx.EVT_MENU, self._onBrowseMirrorStore, mirrorItem)
 		# Translators: Tools menu item opening the Add-on Store at NVDA's official store.
 		officialItem = toolsMenu.Append(
 			wx.ID_ANY, _("Add-on store (&official NVDA store)..."),
 		)
 		sysTrayIcon.Bind(wx.EVT_MENU, self._onBrowseOfficialStore, officialItem)
-		self._toolsMenuItems = [mirrorItem, officialItem]
-		log.info("Added mirror/official Add-on Store items to the Tools menu")
+		self._toolsMenuItems = [officialItem]
+		log.info("Added official Add-on Store item to the Tools menu")
 
 	def _removeToolsMenuItems(self):
 		if not self._toolsMenuItems:
@@ -509,9 +508,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		except (ImportError, ValueError):
 			pass
 		self._settingsPanelRegistered = False
-
-	def _onBrowseMirrorStore(self, evt):
-		self._openStore(MIRROR_STORE_URL, restoreURL=None)
 
 	def _onBrowseOfficialStore(self, evt):
 		# An empty baseServerURL is NVDA's official store; switch back to the
