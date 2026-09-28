@@ -2994,6 +2994,7 @@
    "description": "The WebcamHelper add-on will help you position yourself in front of the camera during video calls.\nIt will tell you if you are too close or too far from the camera,\nwhether you are too far to the left or to the right, whether you are too high or too low,\nand if the lighting is too dark or too bright.\nIt will also tell you if you are too close to the edge of the frame, which may mean you are too close to the edge of the camera's field of view.\nAfter installing the add-on, press NVDA+Shift+W and follow the instructions.\nAfter you hear the message (Face is positioned correctly) - you can press the Escape key to stop the function and release the camera."
   },
   "Winboard": {
+   "summary": "Winboard",
    "description": "The Winboard add-on improves accessibility when using the Winboard chess program of the same name with NVDA."
   },
   "brailleMultiline": {
@@ -3009,15 +3010,18 @@
    "description": "The FindExtended add-on removes the dialog box that appears when no more occurrences are found during a search operation.\nInstead, only a message is issued.\nThe add-on has no settings."
   },
   "NVDAScripts": {
+   "summary": "NVDA Scripts",
    "description": "The NVDAScripts add-on is a set of several scripts.\nCyclical switching of the automatic speech language detection mode: off, language only and language+dialect using the NVDA+shift+L key combination.\nCyclic switching of audio output devices.\nChanging speech parameters while working Read everything without stopping Read everything.\nRemove the dialog box that appears when no more matches are found during a search.\nChange speech rate when a language other than the default language is detected.\nOpen PDF recognition in Adobe Reader using MS word.\nAdaptation of CamelCase word separation rules to eliminate cases of Roman ordinal numbers used in French.\nAnd some others."
   },
   "zPod": {
    "description": "ZPod add-on that will allow you to quickly view a folder with a large number of media files without going into the player.\nThis is useful for those people who need to quickly view the contents of a media file and act on it, unless it is someone who wants to quickly move on to the next one and view it.\nThis plugin can play up to 139 media extensions.\nIt is valid for both audio and video extensions, but clearly if it were a video only the audio would be heard, this plugin has no interface and handles everything using user assigned keys.\nThis plugin does not require any additional programs installed on the system and does not depend on any library outside the plugin, so it is valid for previewing the media file at any point in time when we do not have a shared player."
   },
   "ocr": {
+   "summary": "OCR",
    "description": "The OCR add-on performs optical character recognition (OCR) to extract text from an inaccessible object.\nThe Tesseract text recognition engine is used.\nTo perform recognition, navigate to the object in question using object navigation and press the NVDA+R key combination.\nYou can configure the recognition language by going to the NVDA settings panel and selecting Recognition Options. The keyboard shortcut can be reassigned from the NVDA Input Gesture dialog box in the Miscellaneous category.\nImportant: If you are using NVDA 2017.3 or newer on Windows 10, please consider using built-in recognition\nWindows 10"
   },
   "zPodCast": {
+   "summary": "ZPodCast",
    "description": "The ZPodCast add-on will add a player for listening, adding podcast channels and managing added podcasts.\nAn Internet connection is required for the add-on to work.\nDetailed instructions for the add-on can be found in the help."
   },
   "zBackup": {
@@ -3048,6 +3052,7 @@
    "description": "The WhatsAppDesktop add-on adds keyboard shortcuts for quick access to certain functions of the WhatsApp Desktop application of the same name - from the Windows store.\nThe keyboard shortcut can be found in the help after installing the add-on."
   },
   "vnDict": {
+   "summary": "VN Dictate",
    "description": "The VnDict add-on adds functionality to switch voices between English and Vietnamese.\nKeyboard shortcut: NVDA+(backtick) and (backtap)."
   },
   "volume_on_startup": {
@@ -3070,9 +3075,11 @@
    "description": "The ToneMaster add-on plays musical melodies created from tone data files using NVDA audio signals.\nTo get started, go to NVDA->Tools->Tone Master.\nPress NVDA+Alt+T to play the loaded tone data file. To stop playback, press NVDA+Alt+Shift+T."
   },
   "teamviewerQS": {
+   "summary": "TeamViewer QS",
    "description": "The TeamWiewerQS add-on improves the accessibility and ease of use of the TeamViewerQS program of the same name with NVDA."
   },
   "Texto para telegram": {
+   "summary": "Text for Telegram",
    "description": "The TextoParaTelegram add-on sends the text that is currently in the transmission area for a non-Telegram bot.\nTo send the text, press the command NVDA+0."
   },
   "speechSpyBroadcaster": {
@@ -3088,6 +3095,7 @@
    "description": "The Sleep add-on will add a delayed sleep function.\nPress NVDA+Slash and then enter the number of minutes after which NVDA speech will stop.\nThen confirm Yes or No whether your computer should go to sleep after speech stops.\nAfter that, launch the read all mode, enjoy reading and don’t worry if you fall asleep, NVDA will also go to sleep after the set time."
   },
   "qrvocabulary": {
+   "summary": "QRVocabulary",
    "description": "The QRVocabulary add-on allows you to find the meaning of a selected word or open an editable panel dialog to search the language dictionary.\nAvailable dictionaries:\nSpanish dictionary.\nEnglish dictionary.\nItalian dictionary.\nThe keyboard shortcuts are described in the add-on help."
   },
   "SoundSymbols": {
@@ -3107,9 +3115,11 @@
    "description": "RibbonExplorer add-on to improve work with the ribbon menu.\nCurrently only for Microsoft office products.\nConfirmed (by users) Works in Microsoft Office 2019, 365 and 2021.\nCompatibility with older versions of NVDA and Office is not guaranteed.\nSimply install, open the Office app, press Alt to access the Ribbon, and check out the new menu layout.\nYou can use the keys: arrows, TAB, Enter, Escape, just like in a regular menu.\nAlt+Down Arrow/Up Arrow are also supported to expand some controls."
   },
   "NVBox": {
+   "summary": "NVBox",
    "description": "The NVBox add-on extends the functionality of NVDA.\nThis plugin adds verification code recognition, OCR text recognition, weather/stocks/funds/exchange rate query, Android device assistance, iFlytek offline voice, VVTTS voice and advanced support for Tencent QQ, WeChat and YY voice to NVDA.\nThe add-on uses Chinese services."
   },
   "RAT_OCR": {
+   "summary": "RAT OCR",
    "description": "The RAT_OCR add-on, performs real-time OCR on the entire screen, refreshing it at a specified interval... or by pressing: NVDA + Windows + F5.>> or Auto OCR: Any location or focus changes, this option will be performed when you select Location Assistant - Navigator Objects.\nSwitch the mode for the RAT_OCR service using: two presses of the NVDA+Windows+F5 key combinations.\nTo open the add-on settings, press: NVDA+Alt+F5.\nKeyboard shortcuts can be changed in input gestures, in the corresponding section for additions."
   },
   "piper_neural_voices": {
