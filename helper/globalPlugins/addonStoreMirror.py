@@ -583,16 +583,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			toolsMenu = gui.mainFrame.sysTrayIcon.toolsMenu
 		except (ImportError, AttributeError):
 			self._toolsMenuItems = []
-			if self._bundleMenu is not None:
-				self._bundleMenu.Destroy()
-				self._bundleMenu = None
+			self._bundleMenu = None
 			return
 		for item in self._toolsMenuItems:
-			toolsMenu.Remove(item)
+			toolsMenu.DestroyItem(item)
 		self._toolsMenuItems = []
-		if self._bundleMenu is not None:
-			self._bundleMenu.Destroy()
-			self._bundleMenu = None
+		self._bundleMenu = None
 
 	def _registerSettingsPanel(self):
 		try:

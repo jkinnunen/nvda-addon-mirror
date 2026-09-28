@@ -121,8 +121,8 @@ https://serrebidev.github.io/nvda-addon-mirror
 Three ways to do this:
 
 1. **Install the helper add-on** — latest build:
-   [dist/addonStoreMirror-1.4.1.nvda-addon](dist/addonStoreMirror-1.4.1.nvda-addon)
-   (raw link: https://raw.githubusercontent.com/serrebidev/nvda-addon-mirror/main/dist/addonStoreMirror-1.4.1.nvda-addon).
+   [dist/addonStoreMirror-1.4.2.nvda-addon](dist/addonStoreMirror-1.4.2.nvda-addon)
+   (raw link: https://raw.githubusercontent.com/serrebidev/nvda-addon-mirror/main/dist/addonStoreMirror-1.4.2.nvda-addon).
    It sets `[addonStore] baseServerURL` to the mirror on startup and restores it
    when disabled — the same mechanism
    [nvdacn/NVDAUpdateMirror](https://github.com/nvdacn/NVDAUpdateMirror) uses.

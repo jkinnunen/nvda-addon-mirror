@@ -533,7 +533,7 @@ class HelperToolsMenuTests(unittest.TestCase):
         class FakeToolsMenu:
             def __init__(self):
                 self.items = []
-                self.removed = []
+                self.destroyed = []
 
             def Append(self, _id, label):
                 item = ("item", label)
@@ -545,9 +545,12 @@ class HelperToolsMenuTests(unittest.TestCase):
                 self.items.append(item)
                 return item
 
-            def Remove(self, item):
-                self.removed.append(item)
-                return item
+            def DestroyItem(self, item):
+                self.items.remove(item)
+                self.destroyed.append(item)
+                if item[0] == "submenu":
+                    item[2].Destroy()
+                return True
 
         class FakeSysTrayIcon:
             def __init__(self):
@@ -611,7 +614,8 @@ class HelperToolsMenuTests(unittest.TestCase):
         bundleMenu = plugin._bundleMenu
         with mock.patch.dict(sys.modules, modules):
             plugin._removeToolsMenuItems()
-        self.assertEqual(2, len(menu.removed))
+        self.assertEqual(2, len(menu.destroyed))
+        self.assertEqual([], menu.items)
         self.assertEqual([], plugin._toolsMenuItems)
         self.assertIsNone(plugin._bundleMenu)
         self.assertTrue(bundleMenu.destroyed)
@@ -974,7 +978,7 @@ class HelperInitTerminateTests(unittest.TestCase):
         class FakeToolsMenu:
             def __init__(self):
                 self.items = []
-                self.removed = []
+                self.destroyed = []
 
             def Append(self, _id, label):
                 item = ("item", label)
@@ -986,8 +990,9 @@ class HelperInitTerminateTests(unittest.TestCase):
                 self.items.append(item)
                 return item
 
-            def Remove(self, item):
-                self.removed.append(item)
+            def DestroyItem(self, item):
+                self.items.remove(item)
+                self.destroyed.append(item)
 
         class FakeSysTrayIcon:
             def __init__(self):
@@ -1053,7 +1058,7 @@ class HelperInitTerminateTests(unittest.TestCase):
             plugin.terminate()
 
         self.assertEqual("", self.config.conf["addonStore"]["baseServerURL"])
-        self.assertEqual(2, len(menu.removed))
+        self.assertEqual(2, len(menu.destroyed))
         self.assertEqual([], plugin._toolsMenuItems)
         self.assertIsNone(plugin._bundleMenu)
         self.assertEqual(
