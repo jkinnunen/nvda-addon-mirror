@@ -863,6 +863,43 @@ class HelperSettingsPanelTests(unittest.TestCase):
             panel.onSave()
         self.assertTrue(self.config.conf["serrebiStore"]["searchAsYouType"])
 
+    def test_makeSettings_plain_sizer_without_addItem(self):
+        # NVDA 2026.3 removed guiHelper.BoxSizer.addItem: the settings sizer
+        # is a plain wx sizer there, so makeSettings must fall back to Add.
+        helper = self._loadHelper({})
+
+        class FakeCheckBox:
+            def __init__(self, parent, label):
+                self.label = label
+                self.value = None
+
+            def SetValue(self, value):
+                self.value = value
+
+            def IsChecked(self):
+                return self.value
+
+        self.wx.CheckBox = FakeCheckBox
+        added = {}
+
+        class PlainSizer:
+            def Add(self, item):
+                added["checkbox"] = item
+                return item
+
+        panel = helper.SerrebiStoreSettingsPanel()
+        self.config.conf["serrebiStore"] = {"searchAsYouType": True}
+        modules = {"wx": self.wx, "config": self.config}
+        with mock.patch.dict(sys.modules, modules), mock.patch.object(
+            builtins, "_", lambda text: text, create=True,
+        ):
+            panel.makeSettings(PlainSizer())
+        self.assertTrue(added["checkbox"].value)
+        added["checkbox"].value = False
+        with mock.patch.dict(sys.modules, modules):
+            panel.onSave()
+        self.assertFalse(self.config.conf["serrebiStore"]["searchAsYouType"])
+
 
 class HelperInitTerminateTests(unittest.TestCase):
     """Full __init__/terminate wiring with every collaborator faked."""

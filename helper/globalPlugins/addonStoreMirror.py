@@ -62,15 +62,22 @@ class SerrebiStoreSettingsPanel(_SettingsPanelBase):
 			searchAsYouType = config.conf["serrebiStore"]["searchAsYouType"]
 		except KeyError:
 			searchAsYouType = True
-		self._searchAsYouTypeCheckBox = settingsSizer.addItem(
-			wx.CheckBox(
-				self,
-				# Translators: A setting controlling whether the Add-on Store
-				# filters the list while typing. When off, the list only
-				# filters when Enter is pressed in the search field.
-				label=_("&Search while typing in the Add-on Store"),
-			)
+		checkBox = wx.CheckBox(
+			self,
+			# Translators: A setting controlling whether the Add-on Store
+			# filters the list while typing. When off, the list only
+			# filters when Enter is pressed in the search field.
+			label=_("&Search while typing in the Add-on Store"),
 		)
+		# NVDA 2026.3 removed guiHelper.BoxSizer.addItem, so the settings
+		# sizer is a plain wx sizer there. Use addItem where it exists and
+		# fall back to Add otherwise.
+		addItem = getattr(settingsSizer, "addItem", None)
+		if addItem is not None:
+			self._searchAsYouTypeCheckBox = addItem(checkBox)
+		else:
+			settingsSizer.Add(checkBox)
+			self._searchAsYouTypeCheckBox = checkBox
 		self._searchAsYouTypeCheckBox.SetValue(bool(searchAsYouType))
 
 	def onSave(self):
