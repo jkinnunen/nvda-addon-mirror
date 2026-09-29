@@ -99,3 +99,29 @@ into other locales.
 - Never put a provider key back into the workflow or the code. The old
   `OPENROUTER_API_KEY` secret was deleted; the workflow still references it
   but the code ignores it (`.github/workflows` is not to be edited).
+
+## Muse cloud check: finish the translation queue
+
+The Muse cloud agent is the maintainer when a gap is left open. Every hourly
+update-mirror run writes the queue into its own log, before it touches the
+translation-gap issue, so the queue exists even when `gh` could not open or
+update the issue.
+
+1. Read the queue from the newest run:
+   `gh run list -w update-mirror -L 1 --json databaseId -q '.[0].databaseId'`,
+   then `gh run view <id> --log | grep -o 'TRANSLATION-QUEUE {.*'`. Each line
+   after the prefix is one JSON finding: `addonId`, `sourceURL`, and `fields`
+   with the full non-English `text`. `TRANSLATION-QUEUE-EMPTY` means nothing
+   to do. The open `translation-gap` issue shows the same list, truncated.
+2. If `gh` itself is unavailable, run the auditor directly; it reads the live
+   site and needs no GitHub access:
+   `python audit_translations.py --json findings.json`.
+3. For each `addonId`, add an English `summary` (for `displayName`) and/or
+   `description` to `translations.json` under that exact id. A name gets the
+   English first and the original after `, AKA ` (`"Descriptor, AKA
+   Betimleyici"`). Only add missing fields; never change a field a human
+   already wrote. Keep the file's format: `indent=1`, insertion order, real
+   UTF-8 characters rather than `\u` escapes, no `sort_keys`.
+4. Run `python -W error -m unittest discover -s tests`, commit only
+   `translations.json`, and push to main. The push rebuilds the mirror, and
+   the next audit closes the issue on its own.

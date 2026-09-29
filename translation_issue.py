@@ -194,8 +194,47 @@ def close_issue(gh=default_gh, repository=None):
     print(f"Closed issue #{number}.")
 
 
+#: Prefix of the run-log lines the Muse cloud agent greps for. See AGENTS.md
+#: "Muse cloud check". Changing it strands that agent: update both together.
+QUEUE_LOG_PREFIX = "TRANSLATION-QUEUE"
+
+
+def log_queue(findings, out=None):
+    """Write the translation queue into the workflow run log.
+
+    The issue is the friendly view; the run log is the one that survives when
+    ``gh`` cannot reach the issue (missing permission, API outage, a body
+    GitHub refuses). The Muse cloud agent reads these lines from the latest
+    update-mirror run and adds the English itself. One JSON object per line,
+    in full: the issue body truncates long text, this does not. ASCII-escaped
+    JSON, so no console encoding can break the step; parsing restores the text.
+    """
+    out = out or sys.stdout
+    if not findings:
+        print(f"{QUEUE_LOG_PREFIX}-EMPTY", file=out)
+        return
+    print(f"{QUEUE_LOG_PREFIX}-BEGIN count={len(findings)}", file=out)
+    for finding in findings:
+        print(
+            f"{QUEUE_LOG_PREFIX} "
+            + json.dumps(finding, separators=(",", ":")),
+            file=out,
+        )
+    print(f"{QUEUE_LOG_PREFIX}-END", file=out)
+    # An annotation shows in `gh run view` without downloading the full log.
+    print(
+        f"::warning title=Translation queue::{len(findings)} add-on(s) still "
+        f"publish non-English text; the {QUEUE_LOG_PREFIX} lines in this log "
+        "list them for the Muse cloud check",
+        file=out,
+    )
+
+
 def sync_issue(findings_path, gh=default_gh, repository=None):
     """Make the gap issue match a findings file: open, update, or close.
+
+    The queue is written to the run log first, so it is recorded even when
+    every ``gh`` call below fails.
 
     A missing findings file raises instead of closing, because a crashed
     audit must never close an issue that may still describe real gaps. The
@@ -204,10 +243,20 @@ def sync_issue(findings_path, gh=default_gh, repository=None):
     """
     with open(findings_path, "r", encoding="utf-8") as handle:
         findings = json.load(handle)
-    if findings:
-        open_issue(findings_path, gh, repository)
-    else:
-        close_issue(gh, repository)
+    log_queue(findings)
+    try:
+        if findings:
+            open_issue(findings_path, gh, repository)
+        else:
+            close_issue(gh, repository)
+    except Exception as exc:
+        # An annotation is one line; gh's output often is not.
+        reason = " ".join(str(exc).split()) or type(exc).__name__
+        print(
+            f"::error title=Translation issue not updated::{reason}. The "
+            f"{QUEUE_LOG_PREFIX} lines above are the queue of record.",
+        )
+        raise
 
 
 def main(argv=None):

@@ -1,3 +1,4 @@
+import io
 import json
 import tempfile
 import unittest
@@ -224,6 +225,32 @@ class SyncIssueTests(TempFileTestCase):
         with mock.patch.dict("os.environ", {"GITHUB_REPOSITORY": "owner/repo"}):
             translation_issue.sync_issue(path, gh=gh)
         self.assertTrue(any(c[:2] == ["issue", "close"] for c in calls))
+
+    def test_queue_reaches_the_log_even_when_gh_fails(self):
+        def gh(_args):
+            raise FileNotFoundError("gh")
+
+        findings = make_findings()
+        path = self.write_findings(findings)
+        out = io.StringIO()
+        with mock.patch.dict("os.environ", {"GITHUB_REPOSITORY": "owner/repo"}), \
+                mock.patch("sys.stdout", out):
+            with self.assertRaises(FileNotFoundError):
+                translation_issue.sync_issue(path, gh=gh)
+        lines = out.getvalue().splitlines()
+        prefix = translation_issue.QUEUE_LOG_PREFIX + " "
+        logged = [json.loads(line[len(prefix):]) for line in lines if line.startswith(prefix)]
+        # Full text, not the issue's truncated copy.
+        self.assertEqual(findings, logged)
+        self.assertIn(f"{translation_issue.QUEUE_LOG_PREFIX}-BEGIN count=2", lines)
+        self.assertTrue(any(line.startswith("::error ") for line in lines))
+
+    def test_empty_queue_is_logged(self):
+        out = io.StringIO()
+        translation_issue.log_queue([], out=out)
+        self.assertEqual(
+            f"{translation_issue.QUEUE_LOG_PREFIX}-EMPTY\n", out.getvalue(),
+        )
 
     def test_missing_findings_file_raises_rather_than_closing(self):
         with mock.patch.dict("os.environ", {"GITHUB_REPOSITORY": "owner/repo"}):
