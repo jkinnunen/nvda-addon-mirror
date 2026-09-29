@@ -80,6 +80,14 @@ class RenderBodyTests(unittest.TestCase):
 
 
 class TempFileTestCase(unittest.TestCase):
+    def setUp(self):
+        # sync_issue prints TRANSLATION-QUEUE lines, and CI runs these tests in
+        # the same workflow log the Muse cloud check greps. Fixture add-ons
+        # must never reach it as if they were real gaps.
+        patcher = mock.patch("sys.stdout", io.StringIO())
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def write_findings(self, findings):
         handle = tempfile.NamedTemporaryFile(
             "w", suffix=".json", delete=False, encoding="utf-8"
