@@ -447,5 +447,50 @@ class InstallTests(unittest.TestCase):
         self.assertEqual([("Alpha", "broken manifest")], result["failed"])
 
 
+class DowngradeStatusTests(unittest.TestCase):
+    def test_older_bundle_version_is_not_an_update(self):
+        bundle = bundles.buildBundle("b", [
+            bundles.makeEntry(addonId="alpha", displayName="Alpha", installedVersion="1.0",
+                              mode=bundles.MODE_PINNED, version="1.0",
+                              url="https://example.org/a.nvda-addon"),
+        ])
+        installedMap = {"alpha": {"addonId": "alpha", "displayName": "Alpha", "version": "2.1"}}
+        [item] = bundles.resolveEntries(bundle, {}, installedMap)
+        self.assertEqual("older", item["status"])
+
+    def test_unparseable_versions_still_count_as_update(self):
+        bundle = bundles.buildBundle("b", [
+            bundles.makeEntry(addonId="alpha", displayName="Alpha", installedVersion="x",
+                              mode=bundles.MODE_PINNED, version="nightly",
+                              url="https://example.org/a.nvda-addon"),
+        ])
+        installedMap = {"alpha": {"addonId": "alpha", "displayName": "Alpha", "version": "2.1"}}
+        [item] = bundles.resolveEntries(bundle, {}, installedMap)
+        self.assertEqual("update", item["status"])
+
+
+class RunPumpedTests(unittest.TestCase):
+    """Network work must run through NVDA's ExecAndPump, not on the GUI thread."""
+
+    def test_uses_exec_and_pump_inside_nvda(self):
+        calls = []
+
+        class ExecAndPump:
+            def __init__(self, func, *args, **kwargs):
+                calls.append((func, args, kwargs))
+                self.funcRes = func(*args, **kwargs)
+
+        systemUtils = types.ModuleType("systemUtils")
+        systemUtils.ExecAndPump = ExecAndPump
+        with mock.patch.dict(sys.modules, {"systemUtils": systemUtils}):
+            result = bundles.runPumped(lambda value: value * 2, 21)
+        self.assertEqual(42, result)
+        self.assertEqual(1, len(calls))
+
+    def test_runs_directly_outside_nvda(self):
+        with mock.patch.dict(sys.modules, {"systemUtils": None}):
+            self.assertEqual(3, bundles.runPumped(lambda: 3))
+
+
 if __name__ == "__main__":
     unittest.main()

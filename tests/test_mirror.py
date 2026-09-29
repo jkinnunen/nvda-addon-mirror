@@ -1510,5 +1510,53 @@ class HelperSafetyTests(unittest.TestCase):
         self.assertIn("dataManager.addonDataManager", source)
 
 
+class ManifestParsingTests(unittest.TestCase):
+    def test_multiline_triple_quoted_value_is_read_in_full(self):
+        manifest = (
+            'name = x\n'
+            'description = """First line\n'
+            'second line\n'
+            'third."""\n'
+            'version = 1.0\n'
+        )
+        self.assertEqual(
+            "First line\nsecond line\nthird.",
+            mirror._manifest_value(manifest, "description"),
+        )
+        self.assertEqual("1.0", mirror._manifest_value(manifest, "version"))
+
+    def test_single_line_quoting_is_still_removed(self):
+        manifest = 'summary = """Nice"""\nauthor = "Me"\ndescription = """"""\n'
+        self.assertEqual("Nice", mirror._manifest_value(manifest, "summary"))
+        self.assertEqual("Me", mirror._manifest_value(manifest, "author"))
+        self.assertEqual("", mirror._manifest_value(manifest, "description"))
+
+    def test_pinned_rename_survives_a_bom(self):
+        bundle = io.BytesIO()
+        with zipfile.ZipFile(bundle, "w") as archive:
+            archive.writestr(
+                "manifest.ini",
+                "﻿name = original\nsummary = S\nversion = 1.2\n".encode("utf-8"),
+            )
+        releases = [{
+            "prerelease": False,
+            "tag_name": "v1.2",
+            "name": "1.2",
+            "assets": [{"name": "x-1.2.nvda-addon",
+                        "browser_download_url": "https://example.org/x"}],
+        }]
+        with mock.patch.object(
+            mirror, "http_get", return_value=json.dumps(releases).encode("utf-8"),
+        ), mock.patch.object(
+            mirror, "cached_pinned_bundle", return_value=bundle.getvalue(),
+        ):
+            [entry] = mirror._fetch_one_pinned(
+                {"fork_policy": "include"}, "owner/x", "renamedId",
+            )
+        with zipfile.ZipFile(io.BytesIO(entry["_patched_bytes"])) as archive:
+            manifest = archive.read("manifest.ini").decode("utf-8-sig")
+        self.assertEqual("renamedId", mirror._manifest_name(manifest))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -18,6 +18,7 @@ fully-offline bundles with embedded files, can be added later.
 import hashlib
 import json
 import os
+import re
 import tempfile
 import urllib.request
 from datetime import datetime, timezone
@@ -38,6 +39,27 @@ _DOWNLOAD_CHUNK = 65536
 
 class BundleError(Exception):
 	"""Raised when a bundle file cannot be read or is invalid."""
+
+
+def runPumped(func, *args, **kwargs):
+	"""Run *func* off the GUI thread while pumping its messages.
+
+	Network calls made straight from a menu or button handler block NVDA's main
+	thread, and NVDA goes silent until they finish. NVDA's own ExecAndPump runs
+	the call in a worker thread and keeps the main thread's messages flowing,
+	re-raising any exception here. Outside NVDA the call just runs directly.
+	"""
+	try:
+		from systemUtils import ExecAndPump
+	except ImportError:
+		return func(*args, **kwargs)
+	return ExecAndPump(func, *args, **kwargs).funcRes
+
+
+def _versionKey(version):
+	"""Numeric parts of a version string, or None when it has none."""
+	parts = [int(part) for part in re.findall(r"\d+", version or "")]
+	return tuple(parts) if parts else None
 
 
 def buildBundle(name, entries):
@@ -200,8 +222,9 @@ def resolveEntries(bundle, catalogMap, installedMap):
 
 	Returns a list of ``{"addonId", "displayName", "version", "url",
 	"sha256", "source", "status", "installedVersion"}`` dicts. *status* is one
-	of ``new``, ``update`` (installed version differs), ``up-to-date`` or
-	``unavailable`` (no download location known).
+	of ``new``, ``update`` (installed version differs), ``older`` (the bundle's
+	version is below the installed one, so installing would downgrade),
+	``up-to-date`` or ``unavailable`` (no download location known).
 	"""
 	resolved = []
 	for entry in bundle["addons"]:
@@ -225,6 +248,13 @@ def resolveEntries(bundle, catalogMap, installedMap):
 			status = "unavailable"
 		elif installed and installedVersion == version:
 			status = "up-to-date"
+		elif (
+			installed
+			and _versionKey(version) is not None
+			and _versionKey(installedVersion) is not None
+			and _versionKey(version) < _versionKey(installedVersion)
+		):
+			status = "older"
 		elif installed:
 			status = "update"
 		else:
@@ -392,10 +422,18 @@ class ExportBundleDialog(wx.Dialog):
 			)
 			return
 		pinVersions = self.modeRadio.GetSelection() == 1
+		# Messages keep flowing while the catalog downloads, so a second press
+		# of Export can arrive meanwhile. Ignore it rather than disabling the
+		# focused button, which would strand keyboard focus.
+		if getattr(self, "_exporting", False):
+			return
+		self._exporting = True
 		try:
-			catalogMap = fetchCatalogMap()
+			catalogMap = runPumped(fetchCatalogMap)
 		except Exception:
 			catalogMap = {}
+		finally:
+			self._exporting = False
 		entries = buildExportEntries(selected, catalogMap, pinVersions)
 		bundle = buildBundle(self.nameCtrl.GetValue().strip() or _("NVDA add-ons"), entries)
 		# Translators: File dialog title and filter for saving a bundle.
@@ -471,6 +509,11 @@ class ImportBundleDialog(wx.Dialog):
 			detail = _("installed: {old}, bundle: {new}").format(
 				old=item["installedVersion"], new=item["version"] or _("unknown"),
 			)
+		elif status == "older":
+			# Translators: {old} installed version, {new} older bundle version.
+			detail = _("installed {old} is newer than bundle {new}").format(
+				old=item["installedVersion"], new=item["version"],
+			)
 		elif status == "unavailable":
 			# Translators: Shown when a bundle entry has no known download.
 			detail = _("no download available")
@@ -510,7 +553,11 @@ class ImportBundleDialog(wx.Dialog):
 			progress.Update(index, _("{name}: {stage}...").format(name=displayName, stage=stageLabel))
 
 		try:
-			result = installResolved(available, progress=onProgress)
+			result = installResolved(
+				available,
+				downloader=lambda url: runPumped(downloadToTemp, url),
+				progress=onProgress,
+			)
 		finally:
 			progress.Destroy()
 		lines = []

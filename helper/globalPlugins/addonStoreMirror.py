@@ -143,6 +143,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			listViewModelModule = importlib.import_module(
 				"gui.addonStoreGui.viewModels.addonList"
 			)
+			# dataManager imports the model factories by name, so its copies
+			# (used for the per-add-on installed cache) need patching as well.
+			try:
+				dataManagerModule = importlib.import_module("addonStore.dataManager")
+			except ImportError:
+				dataManagerModule = None
 
 			for functionName in (
 				"_createStoreModelFromData",
@@ -160,6 +166,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 					return model
 
 				self._rememberPatch(modelModule, functionName, createModel)
+				if getattr(dataManagerModule, functionName, None) is original:
+					self._rememberPatch(dataManagerModule, functionName, createModel)
 
 			modelBase = modelModule._AddonGUIModel
 			originalAsDict = modelBase.asdict
@@ -444,7 +452,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 						_("Duplicate add-ons selected"),
 						wx.YES_NO | wx.ICON_WARNING,
 					)
-					if answer != wx.ID_YES:
+					# gui.messageBox wraps wx.MessageBox, which answers wx.YES,
+					# not the button id wx.ID_YES.
+					if answer != wx.YES:
 						return
 				else:
 					log.warning(
@@ -560,7 +570,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			wx.MessageBox(str(e), _("Install from add-on bundle"), wx.OK | wx.ICON_ERROR)
 			return
 		try:
-			catalogMap = addonStoreBundles.fetchCatalogMap()
+			catalogMap = addonStoreBundles.runPumped(addonStoreBundles.fetchCatalogMap)
 		except Exception:
 			log.warning("Could not fetch the mirror catalog for bundle import", exc_info=True)
 			catalogMap = {}
@@ -649,7 +659,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 				error.dialog.SetFocus()
 				return
 			if restoreURL is not None:
-				dialog.Bind(wx.EVT_CLOSE, self._makeCloseRestorer(restoreURL))
+				# Not EVT_CLOSE: NVDA's Close button destroys the dialog
+				# directly (SettingsDialog.onClose -> DestroyLater) without
+				# one, so only the destroy event is seen on every way out.
+				dialog.Bind(wx.EVT_WINDOW_DESTROY, self._makeCloseRestorer(dialog, restoreURL))
 			dialog.Show()
 		except Exception:
 			config.conf["addonStore"]["baseServerURL"] = previousURL
@@ -660,13 +673,15 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			if postPopup is not None:
 				postPopup()
 
-	def _makeCloseRestorer(self, restoreURL):
-		def onClose(evt):
-			config.conf["addonStore"]["baseServerURL"] = restoreURL
-			self._refreshStore()
+	def _makeCloseRestorer(self, dialog, restoreURL):
+		def onDestroy(evt):
+			# Destroy events from child controls reach the dialog too.
+			if evt.GetEventObject() is dialog:
+				config.conf["addonStore"]["baseServerURL"] = restoreURL
+				self._refreshStore()
 			evt.Skip()
 
-		return onClose
+		return onDestroy
 
 
 def _getModelSource(model):

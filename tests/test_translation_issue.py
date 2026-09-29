@@ -35,6 +35,17 @@ def make_findings():
     ]
 
 
+class RenderBodyLimitTests(unittest.TestCase):
+    def test_body_stays_under_githubs_limit(self):
+        finding = make_findings()[0]
+        findings = [dict(finding, addonId=f"addon{index}") for index in range(200)]
+        body = translation_issue.render_body(findings, "owner/repo")
+        self.assertLessEqual(len(body), 65536)
+        self.assertIn("more, left out to fit", body)
+        self.assertIn("addon0", body)
+        self.assertTrue(body.endswith("</sub>"))
+
+
 class RenderBodyTests(unittest.TestCase):
     def test_body_is_deterministic_and_lists_every_addon(self):
         findings = make_findings()

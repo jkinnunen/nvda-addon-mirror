@@ -1096,7 +1096,9 @@ def _fetch_one_pinned(spec, repo, addon_id):
     # api.github.com, so it does not need (or want) the Authorization header.
     raw = cached_pinned_bundle(asset)
     with zipfile.ZipFile(io.BytesIO(raw)) as zf:
-        manifest_text = zf.read("manifest.ini").decode("utf-8")
+        # utf-8-sig: a BOM ahead of "name =" would hide the first line from
+        # the rename below, publishing the variant under the original ID.
+        manifest_text = zf.read("manifest.ini").decode("utf-8-sig")
 
     original_name = _manifest_name(manifest_text)
     if original_name == addon_id:
@@ -1320,17 +1322,19 @@ def _manifest_value(manifest_text, key):
     for i, line in enumerate(lines):
         m = re.match(rf"^{key}\s*=\s*(.*)$", line.strip())
         if m:
-            val = m.group(1).strip().strip('"')
-            # triple-quoted values
-            if val.startswith('"""') and not val.endswith('"""'):
+            val = m.group(1).strip()
+            # A triple-quoted value may run over several lines. Checked before
+            # any quote stripping, which would remove the opening """ too and
+            # leave only the first line.
+            if val.startswith('"""') and (len(val) < 6 or not val.endswith('"""')):
                 rest = []
                 for cont in lines[i + 1:]:
                     if cont.strip().endswith('"""'):
                         rest.append(cont.strip()[:-3])
                         break
                     rest.append(cont.strip())
-                return val[3:] + "\n" + "\n".join(rest)
-            return val
+                return (val[3:] + "\n" + "\n".join(rest)).strip()
+            return val.strip('"')
     return ""
 
 

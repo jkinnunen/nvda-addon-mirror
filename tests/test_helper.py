@@ -180,8 +180,13 @@ class HelperSourceSupportTests(unittest.TestCase):
         listViewModelModule.AddonListItemVM = AddonListItemVM
         listViewModelModule.AddonListVM = AddonListVM
 
+        # NVDA's dataManager imports the factory by name and calls its own copy.
+        dataManagerModule = types.ModuleType("addonStore.dataManager")
+        dataManagerModule._createInstalledStoreModelFromData = createInstalledStoreModel
+
         modules = {
             "addonStore": _package("addonStore"),
+            "addonStore.dataManager": dataManagerModule,
             "addonStore.models": _package("addonStore.models"),
             "addonStore.models.addon": modelModule,
             "gui": _package("gui"),
@@ -222,6 +227,13 @@ class HelperSourceSupportTests(unittest.TestCase):
                 model.asdict()["storeSource"],
             )
 
+            installed = dataManagerModule._createInstalledStoreModelFromData(
+                {"storeSource": "GitHub author release"},
+            )
+            self.assertEqual(
+                "GitHub author release", helper._getModelSource(installed),
+            )
+
             event = types.SimpleNamespace(GetColumn=lambda: 1)
             self.assertIsNone(control.OnColClick(event))
 
@@ -230,6 +242,10 @@ class HelperSourceSupportTests(unittest.TestCase):
         self.assertIs(modelModule._createStoreModelFromData, createStoreModel)
         self.assertIs(
             modelModule._createInstalledStoreModelFromData,
+            createInstalledStoreModel,
+        )
+        self.assertIs(
+            dataManagerModule._createInstalledStoreModelFromData,
             createInstalledStoreModel,
         )
         self.assertEqual(AddonVirtualList._refreshColumns.__name__, "_refreshColumns")
@@ -284,10 +300,14 @@ class HelperNvdaFloorTests(unittest.TestCase):
 
 
 class _FakeEvent:
-    def __init__(self, eventType, keyCode=None):
+    def __init__(self, eventType, keyCode=None, eventObject=None):
         self._eventType = eventType
         self._keyCode = keyCode
+        self._eventObject = eventObject
         self.skipped = False
+
+    def GetEventObject(self):
+        return self._eventObject
 
     def GetEventType(self):
         return self._eventType
@@ -488,7 +508,8 @@ class HelperDuplicateWarningTests(unittest.TestCase):
         _helper, plugin, StoreVM, VM, messages, modules, state, _orig = (
             self._makeStorePlugin()
         )
-        state["answer"] = self.wx.ID_YES
+        # gui.messageBox returns wx.YES, not the button id wx.ID_YES.
+        state["answer"] = self.wx.YES
         vms = [VM("a", "Alpha"), VM("a", "Alpha"), VM("b", "Beta")]
         self._callGetAddons(StoreVM, vms, modules)
         self.assertEqual(1, len(messages))
@@ -496,6 +517,14 @@ class HelperDuplicateWarningTests(unittest.TestCase):
         passed = StoreVM.calls[0][0]
         self.assertEqual(["a", "b"], [vm.Id for vm in passed])
         self.assertIs(vms[0], passed[0])
+
+    def test_duplicate_button_id_is_not_a_yes(self):
+        _helper, plugin, StoreVM, VM, messages, modules, state, _orig = (
+            self._makeStorePlugin()
+        )
+        state["answer"] = self.wx.NO
+        self._callGetAddons(StoreVM, [VM("a", "Alpha"), VM("a", "Alpha")], modules)
+        self.assertEqual([], StoreVM.calls)
 
     def test_duplicate_no_aborts_install(self):
         _helper, plugin, StoreVM, VM, messages, modules, state, _orig = (
@@ -757,18 +786,31 @@ class HelperOpenStoreTests(unittest.TestCase):
         dialog = FakeDialog.instances[0]
         self.assertTrue(dialog.shown)
         self.assertTrue(dialog.storeVM.refreshed)
-        closeHandlers = [
-            handler for event, handler in dialog.binds if event is self.wx.EVT_CLOSE
+        # NVDA's Close button destroys the dialog without an EVT_CLOSE, so the
+        # restore must hang off the destroy event.
+        self.assertEqual(
+            [], [h for event, h in dialog.binds if event is self.wx.EVT_CLOSE],
+        )
+        destroyHandlers = [
+            handler for event, handler in dialog.binds
+            if event is self.wx.EVT_WINDOW_DESTROY
         ]
-        self.assertEqual(1, len(closeHandlers))
+        self.assertEqual(1, len(destroyHandlers))
 
-        closeEvt = _FakeEvent(self.wx.EVT_CLOSE)
+        # A child control's destroy event reaches the dialog too; ignore it.
+        childEvt = _FakeEvent(self.wx.EVT_WINDOW_DESTROY, eventObject=object())
         with mock.patch.dict(sys.modules, modules):
-            closeHandlers[0](closeEvt)
+            destroyHandlers[0](childEvt)
+        self.assertEqual("", self.config.conf["addonStore"]["baseServerURL"])
+        self.assertTrue(childEvt.skipped)
+
+        destroyEvt = _FakeEvent(self.wx.EVT_WINDOW_DESTROY, eventObject=dialog)
+        with mock.patch.dict(sys.modules, modules):
+            destroyHandlers[0](destroyEvt)
         self.assertEqual(
             helper.MIRROR_STORE_URL, self.config.conf["addonStore"]["baseServerURL"]
         )
-        self.assertTrue(closeEvt.skipped)
+        self.assertTrue(destroyEvt.skipped)
         self.assertEqual(["prePopup", "postPopup"], fakes["calls"])
 
     def test_open_mirror_store_binds_no_close_restorer(self):
@@ -783,7 +825,10 @@ class HelperOpenStoreTests(unittest.TestCase):
         dialog = FakeDialog.instances[0]
         self.assertEqual(
             [],
-            [handler for event, handler in dialog.binds if event is self.wx.EVT_CLOSE],
+            [
+                handler for event, handler in dialog.binds
+                if event in (self.wx.EVT_CLOSE, self.wx.EVT_WINDOW_DESTROY)
+            ],
         )
 
     def test_existing_dialog_is_focused_not_reopened(self):
