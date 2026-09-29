@@ -4718,7 +4718,7 @@
   },
   "Eureka A4 – klávesnica pre emulátor": {
    "summary": "Eureka A4 emulator keyboard",
-   "description": "While the emulated Eureka owns the keyboard, NVDA stays silent over its main window and leaves it all the keys \u2014 Eureka speaks for itself. In menus, in dialogs, and after Shift+F11, NVDA reads as usual. Unlike NVDA+Shift+S, sleep mode is tied to the window, not the whole application. When the emulator\u2019s slider moves, its new position is announced, for example volume 12 of 20."
+   "description": "While the emulated Eureka owns the keyboard, NVDA stays silent over its main window and leaves all the keys to it — Eureka speaks for itself. In menus, in dialogs, and after Shift+F11, NVDA reads as usual. Unlike NVDA+Shift+S, sleep mode is tied to the window, not the whole application. When the emulator’s slider moves, its new position is announced, for example volume 12 of 20."
   }
  }
 }
