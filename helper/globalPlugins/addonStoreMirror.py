@@ -10,6 +10,7 @@
 # addonStore.network.BASE_URL and have no [addonStore] baseServerURL setting,
 # so no add-on can redirect their Add-on Store anywhere.
 
+import builtins
 import importlib
 import os
 import threading
@@ -91,6 +92,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		super().__init__()
 		self._sourceSupportPatches = []
 		self._toolsMenuItems = []
+		self._movedStoreItem = None
 		self._bundleMenu = None
 		self._settingsPanelRegistered = False
 		self._originalURL = ""
@@ -371,8 +373,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			searchCtrl = getattr(dialog, "searchFilterCtrl", None)
 			if searchCtrl is not None:
 				searchCtrl.Bind(
-					wx.EVT_KEY_DOWN,
-					lambda evt: plugin._onSearchKeyDown(dialog, evt),
+					# Windows consumes Enter during dialog navigation before a
+					# plain TextCtrl receives EVT_KEY_DOWN. Catch it earlier.
+					wx.EVT_CHAR_HOOK,
+					lambda evt: plugin._onSearchCharHook(dialog, evt),
 				)
 
 		def onFilterTextChange(dialog, evt):
@@ -386,7 +390,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		self._rememberPatch(dialogClass, "_createFilterControls", createFilterControls)
 		self._rememberPatch(dialogClass, "onFilterTextChange", onFilterTextChange)
 
-	def _onSearchKeyDown(self, dialog, evt):
+	def _onSearchCharHook(self, dialog, evt):
 		if (
 			evt.GetKeyCode() in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER)
 			and not self._searchAsYouType
@@ -482,11 +486,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			log.warning("Could not remove stale bundle module", exc_info=True)
 
 	def _addToolsMenuItems(self):
-		"""Add a Tools-menu entry to browse NVDA's official Add-on Store.
-
-		The regular Add-on Store menu option already opens the SerrebiRadio
-		mirror, so only the official store needs its own entry.
-		"""
+		"""Group the existing store command and the official store in a submenu."""
 		try:
 			import gui
 		except ImportError:
@@ -497,14 +497,24 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		except AttributeError:
 			log.debug("Tools menu not available; skipping store menu item")
 			return
-		# Translators: Tools menu item opening the Add-on Store at NVDA's official store.
-		officialItem = toolsMenu.Append(
-			wx.ID_ANY, _("Add-on store (&official NVDA store)..."),
+		storeMenu = wx.Menu()
+		self._movedStoreItem = None
+		# Use NVDA's translation for its own item, preserving its id and handler.
+		regularItem = toolsMenu.FindItemById(toolsMenu.FindItem(builtins._("&Add-on store...")))
+		if regularItem is not None:
+			position = list(toolsMenu.GetMenuItems()).index(regularItem)
+			toolsMenu.Remove(regularItem)
+			storeMenu.Append(regularItem)
+			self._movedStoreItem = (storeMenu, regularItem, position)
+		# Translators: Opens NVDA's official Add-on Store.
+		officialItem = storeMenu.Append(
+			wx.ID_ANY, _("&Official NVDA store..."),
 		)
 		sysTrayIcon.Bind(wx.EVT_MENU, self._onBrowseOfficialStore, officialItem)
-		self._toolsMenuItems = [officialItem]
+		# Translators: Tools submenu containing the mirror and official stores.
+		self._toolsMenuItems = [toolsMenu.AppendSubMenu(storeMenu, _("&Add-on Store"))]
 		self._addBundleMenuItems(toolsMenu, sysTrayIcon)
-		log.info("Added official Add-on Store item to the Tools menu")
+		log.info("Grouped Add-on Store items in the Tools menu")
 
 	def _addBundleMenuItems(self, toolsMenu, sysTrayIcon):
 		"""Add the Add-on bundles submenu (export/import) to the Tools menu."""
@@ -594,7 +604,13 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		except (ImportError, AttributeError):
 			self._toolsMenuItems = []
 			self._bundleMenu = None
+			self._movedStoreItem = None
 			return
+		if self._movedStoreItem is not None:
+			storeMenu, regularItem, position = self._movedStoreItem
+			storeMenu.Remove(regularItem)
+			toolsMenu.Insert(position, regularItem)
+			self._movedStoreItem = None
 		for item in self._toolsMenuItems:
 			toolsMenu.DestroyItem(item)
 		self._toolsMenuItems = []

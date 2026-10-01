@@ -60,9 +60,26 @@ class _FakeMenu:
         self.items = []
         self.destroyed = False
 
-    def Append(self, _id, label):
-        item = ("submenu-item", label)
+    def Append(self, _id, label=None):
+        item = ("submenu-item", label) if label is not None else _id
         self.items.append(item)
+        return item
+
+    def GetMenuItems(self):
+        return list(self.items)
+
+    def FindItem(self, label):
+        return next((i for i, item in enumerate(self.items) if item[1] == label), -1)
+
+    def FindItemById(self, itemId):
+        return self.items[itemId] if itemId >= 0 else None
+
+    def Remove(self, item):
+        self.items.remove(item)
+        return item
+
+    def Insert(self, position, item):
+        self.items.insert(position, item)
         return item
 
     def Destroy(self):
@@ -329,6 +346,10 @@ class HelperDeferredSearchTests(unittest.TestCase):
         class FakeSearchCtrl:
             def __init__(self):
                 self.binds = []
+                self.value = ""
+
+            def GetValue(self):
+                return self.value
 
             def Bind(self, event, handler):
                 self.binds.append((event, handler))
@@ -345,6 +366,7 @@ class HelperDeferredSearchTests(unittest.TestCase):
 
             def onFilterTextChange(self, evt):
                 self.filterCalls.append(evt)
+                self.appliedFilter = self.searchFilterCtrl.GetValue().strip()
 
         storeDialogModule = types.ModuleType("gui.addonStoreGui.controls.storeDialog")
         storeDialogModule.AddonStoreDialog = FakeDialog
@@ -373,7 +395,7 @@ class HelperDeferredSearchTests(unittest.TestCase):
         return [
             handler
             for event, handler in dialog.searchFilterCtrl.binds
-            if event is self.wx.EVT_KEY_DOWN
+            if event is self.wx.EVT_CHAR_HOOK
         ]
 
     def test_create_filter_controls_forwards_sizer_argument(self):
@@ -388,27 +410,35 @@ class HelperDeferredSearchTests(unittest.TestCase):
         _helper, _plugin, dialog = self._makeDialogPlugin(searchAsYouType=False)
 
         textEvt = _FakeEvent(self.wx.wxEVT_TEXT)
+        dialog.searchFilterCtrl.value = "  speech  "
         dialog.onFilterTextChange(textEvt)
         self.assertEqual([], dialog.filterCalls)
         self.assertTrue(textEvt.skipped)
 
-        enterEvt = _FakeEvent(self.wx.EVT_KEY_DOWN, keyCode=self.wx.WXK_RETURN)
+        enterEvt = _FakeEvent(self.wx.EVT_CHAR_HOOK, keyCode=self.wx.WXK_RETURN)
         self._keyHandlers(dialog)[0](enterEvt)
         self.assertEqual([enterEvt], dialog.filterCalls)
+        self.assertEqual("speech", dialog.appliedFilter)
         # Enter must not propagate to the dialog's default button.
         self.assertFalse(enterEvt.skipped)
+
+        dialog.searchFilterCtrl.value = ""
+        dialog.onFilterTextChange(textEvt)
+        self.assertEqual("speech", dialog.appliedFilter)
+        self._keyHandlers(dialog)[0](enterEvt)
+        self.assertEqual("", dialog.appliedFilter)
 
     def test_numpad_enter_also_applies_filter(self):
         _helper, _plugin, dialog = self._makeDialogPlugin(searchAsYouType=False)
         enterEvt = _FakeEvent(
-            self.wx.EVT_KEY_DOWN, keyCode=self.wx.WXK_NUMPAD_ENTER,
+            self.wx.EVT_CHAR_HOOK, keyCode=self.wx.WXK_NUMPAD_ENTER,
         )
         self._keyHandlers(dialog)[0](enterEvt)
         self.assertEqual([enterEvt], dialog.filterCalls)
 
     def test_other_keys_pass_through(self):
         _helper, _plugin, dialog = self._makeDialogPlugin(searchAsYouType=False)
-        keyEvt = _FakeEvent(self.wx.EVT_KEY_DOWN, keyCode=self.wx.WXK_A)
+        keyEvt = _FakeEvent(self.wx.EVT_CHAR_HOOK, keyCode=self.wx.WXK_A)
         self._keyHandlers(dialog)[0](keyEvt)
         self.assertTrue(keyEvt.skipped)
         self.assertEqual([], dialog.filterCalls)
@@ -420,7 +450,7 @@ class HelperDeferredSearchTests(unittest.TestCase):
         dialog.onFilterTextChange(textEvt)
         self.assertEqual([textEvt], dialog.filterCalls)
 
-        enterEvt = _FakeEvent(self.wx.EVT_KEY_DOWN, keyCode=self.wx.WXK_RETURN)
+        enterEvt = _FakeEvent(self.wx.EVT_CHAR_HOOK, keyCode=self.wx.WXK_RETURN)
         self._keyHandlers(dialog)[0](enterEvt)
         self.assertTrue(enterEvt.skipped)
         self.assertEqual([textEvt], dialog.filterCalls)
@@ -550,18 +580,14 @@ class HelperDuplicateWarningTests(unittest.TestCase):
 
 
 class HelperToolsMenuTests(unittest.TestCase):
-    """Tools menu: one extra entry for NVDA's official Add-on Store.
-
-    The regular Add-on Store menu option already opens the SerrebiRadio
-    mirror, so only the official store needs its own entry.
-    """
+    """Move the existing store command into a submenu and restore on unload."""
 
     _loadHelper = HelperSourceSupportTests._loadHelper
 
     def _makeMenuPlugin(self):
-        class FakeToolsMenu:
+        class FakeToolsMenu(_FakeMenu):
             def __init__(self):
-                self.items = []
+                self.items = [("item", "&Add-on store..."), ("item", "Other tool")]
                 self.destroyed = []
 
             def Append(self, _id, label):
@@ -607,9 +633,11 @@ class HelperToolsMenuTests(unittest.TestCase):
     def test_official_store_item_added(self):
         _helper, _plugin, gui, _modules = self._makeMenuPlugin()
         menu = gui.mainFrame.sysTrayIcon.toolsMenu
-        self.assertEqual(2, len(menu.items))
-        _item, label = menu.items[0]
-        self.assertIn("official", label)
+        self.assertEqual(3, len(menu.items))
+        _item, label, submenu = menu.items[1]
+        self.assertEqual("&Add-on Store", label)
+        self.assertEqual(("item", "&Add-on store..."), submenu.items[0])
+        self.assertIn("official", submenu.items[1][1].lower())
         binds = gui.mainFrame.sysTrayIcon.binds
         self.assertEqual(3, len(binds))
         event, _handler, _source = binds[0]
@@ -618,7 +646,7 @@ class HelperToolsMenuTests(unittest.TestCase):
     def test_bundle_submenu_added(self):
         _helper, plugin, gui, _modules = self._makeMenuPlugin()
         menu = gui.mainFrame.sysTrayIcon.toolsMenu
-        kind, label, submenu = menu.items[1]
+        kind, label, submenu = menu.items[2]
         self.assertEqual("submenu", kind)
         self.assertIn("bundle", label.lower())
         self.assertEqual(2, len(submenu.items))
@@ -631,8 +659,7 @@ class HelperToolsMenuTests(unittest.TestCase):
         helper, plugin, _gui, _modules = self._makeMenuPlugin()
         opened = []
         plugin._openStore = lambda url, restoreURL: opened.append((url, restoreURL))
-        for _event, handler, _source in _gui.mainFrame.sysTrayIcon.binds:
-            handler(None)
+        _gui.mainFrame.sysTrayIcon.binds[0][1](None)
         self.assertEqual(
             [(helper.OFFICIAL_STORE_URL, helper.MIRROR_STORE_URL)], opened,
         )
@@ -641,10 +668,14 @@ class HelperToolsMenuTests(unittest.TestCase):
         _helper, plugin, gui, modules = self._makeMenuPlugin()
         menu = gui.mainFrame.sysTrayIcon.toolsMenu
         bundleMenu = plugin._bundleMenu
+        storeMenu = menu.items[1][2]
+        originalItem = storeMenu.items[0]
         with mock.patch.dict(sys.modules, modules):
             plugin._removeToolsMenuItems()
         self.assertEqual(2, len(menu.destroyed))
-        self.assertEqual([], menu.items)
+        self.assertEqual([originalItem, ("item", "Other tool")], menu.items)
+        self.assertIs(originalItem, menu.items[0])
+        self.assertNotIn(originalItem, storeMenu.items)
         self.assertEqual([], plugin._toolsMenuItems)
         self.assertIsNone(plugin._bundleMenu)
         self.assertTrue(bundleMenu.destroyed)
@@ -1020,7 +1051,7 @@ class HelperInitTerminateTests(unittest.TestCase):
         dataManagerMod = types.ModuleType("addonStore.dataManager")
         dataManagerMod.addonDataManager = None
 
-        class FakeToolsMenu:
+        class FakeToolsMenu(_FakeMenu):
             def __init__(self):
                 self.items = []
                 self.destroyed = []
