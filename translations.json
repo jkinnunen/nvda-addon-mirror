@@ -521,6 +521,7 @@
       "description": "The VAC add-on improves the NVDA presentation of the control panel and two audio repeater applications in Virtual Audio Cable (VAC).\nCurrent features:\nNaming fields in all three VAC applications using tooltips associated with each field. This approach works in VAC 4.60 and later.\nDisable progress bars because progress bars are used as counters in VAC.\nAll features of the add-on are described in the reference manual."
     },
     "RHVoiceVoiceManager": {
+      "summary": "RHVoice Voice Manager",
       "description": "The RH Voice Voice Manager add-on adds to NVDA a convenient “RHVoice Voice Manager” functionality with which users of RHVoice speech synthesizers can install or remove voices for selected languages.\nOnly official voices from the developer's website RHVoice.org are available in the manager.\nThe manager is located in the NVDA menu, Service submenu, RHVoice Voice Manager.\nIn the manager dialog there are tabs with languages, when selected, the names of synthesizers with the status Not installed or installed are displayed in the list, as well as the voice version.\nFor uninstalled voices, the “install” button is available.\nOn installed voices, the “delete” button is available.\nOn loaded voices the status is “Will be installed after reboot”.\nAfter clicking the “Close” button, NVDA will be restarted, and voices will be installed or removed depending on the tasks.\nNote: Starting from version 2026.02.28, the server address has been changed to the personal home server of the add-on developer, located in Russia.\nThe reason is that the official server \"rhvoice.org\", located outside of Russia, is not accessible from Russia without bypass tools."
     },
     "NeuralVoiceManager": {
@@ -746,6 +747,7 @@
       "description": "The KlawiszeSchowka add-on adds a function to declare the following clipboard commands.\nWhen you press the keyboard shortcuts Control+X, Control+C, Control+V, the NVDA program announces in speech, respectively: cut, copied, pasted.\nAnd when you press the Control+Z, Control+A, Control+S keys, it announces: cancelled, selected everything and saved."
     },
     "SileroTTS": {
+      "summary": "Silero TTS",
       "description": "Open source SileroTTS driver for standalone speech synthesizer.\nModels can be installed as separate add-ons.\nThe model used by the engine can be selected from the NVDA → Tools → Silero TTS Settings menu.\nIn the synthesizer selection dialog it is called “Silero TTS”.\nVoice models require average computing resources.\nThe driver only works on 64-bit NVDA, starting with NVDA 2026.1.\nVoice models “SileroTTS-model” in the form of add-ons can be downloaded to RuStore.\nOnly version 2.0 models are compatible with this driver version.\nSome useful information is collected in the add-on help."
     },
     "muslimku": {
